@@ -1,8 +1,13 @@
 package com.techup.course_flow_server.repository;
 
 import com.techup.course_flow_server.entity.ModuleProgress;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ModuleProgressRepository extends JpaRepository<ModuleProgress, UUID> {
+    List<ModuleProgress> findAllByEnrollmentId(UUID enrollmentId);
+
+    Optional<ModuleProgress> findByEnrollmentIdAndModuleId(UUID enrollmentId, UUID moduleId);
 }
