@@ -39,8 +39,17 @@ public class Course {
     @Column(nullable = false)
     private String title;
 
+    /**
+     * Short description / summary shown in course card and header.
+     */
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    /**
+     * Full course detail text (syllabus, long copy).
+     */
+    @Column(columnDefinition = "TEXT")
+    private String detail;
 
     @Column(precision = 10, scale = 2)
     private BigDecimal price;
@@ -48,6 +57,30 @@ public class Course {
     private String category;
 
     private String subject;
+
+    /**
+     * Total learning time in hours (e.g. 6, 12).
+     */
+    @Column(name = "total_learning_time")
+    private Integer totalLearningTime;
+
+    /**
+     * Public URL of the course cover image.
+     */
+    @Column(name = "cover_image_url")
+    private String coverImageUrl;
+
+    /**
+     * Public URL of the trailer video.
+     */
+    @Column(name = "trailer_video_url")
+    private String trailerVideoUrl;
+
+    /**
+     * Optional attachment file URL (e.g. PDF syllabus).
+     */
+    @Column(name = "attachment_url")
+    private String attachmentUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

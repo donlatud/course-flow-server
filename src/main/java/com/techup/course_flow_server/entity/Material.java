@@ -44,6 +44,9 @@ public class Material {
     @Column(name = "file_url")
     private String fileUrl;
 
+    @Column(columnDefinition = "TEXT")
+    private String detail;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "file_type", nullable = false)
     private FileType fileType;
