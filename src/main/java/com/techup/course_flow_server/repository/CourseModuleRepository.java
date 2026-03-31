@@ -4,7 +4,17 @@ import com.techup.course_flow_server.entity.CourseModule;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface CourseModuleRepository extends JpaRepository<CourseModule, UUID> {
+
     List<CourseModule> findAllByCourseIdOrderByOrderIndexAsc(UUID courseId);
+
+    /**
+     * Returns pairs of [courseId, lessonCount] for the given course IDs.
+     * Used to build the admin course list without N+1 queries.
+     */
+    @Query("SELECT m.course.id, COUNT(m) FROM CourseModule m WHERE m.course.id IN :courseIds GROUP BY m.course.id")
+    List<Object[]> countByCourseIdIn(@Param("courseIds") List<UUID> courseIds);
 }
