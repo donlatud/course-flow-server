@@ -1,5 +1,9 @@
 package com.techup.course_flow_server.service;
 
+import com.techup.course_flow_server.dto.materialprogress.BatchUpdateItem;
+import com.techup.course_flow_server.dto.materialprogress.BatchUpdateRequest;
+import com.techup.course_flow_server.dto.materialprogress.BatchUpdateResponse;
+import com.techup.course_flow_server.dto.materialprogress.BatchUpdateResultItem;
 import com.techup.course_flow_server.dto.materialprogress.MaterialProgressCreateRequest;
 import com.techup.course_flow_server.dto.materialprogress.MaterialProgressResponse;
 import com.techup.course_flow_server.dto.materialprogress.MaterialProgressUpdateRequest;
@@ -18,6 +22,7 @@ import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -74,12 +79,73 @@ public class MaterialProgressService {
     }
 
     @Transactional
+    public BatchUpdateResponse batchUpdateProgress(BatchUpdateRequest batchRequest, UUID userId) {
+        List<BatchUpdateResultItem> results = new ArrayList<>();
+
+        for (BatchUpdateItem item : batchRequest.getUpdates()) {
+            try {
+                MaterialProgressUpdateRequest updateRequest = MaterialProgressUpdateRequest.builder()
+                        .status(item.getStatus())
+                        .lastPosition(item.getLastPosition())
+                        .completedAt(item.getCompletedAt())
+                        .build();
+
+                MaterialProgressResponse response = updateProgress(item.getProgressId(), updateRequest, userId);
+                
+                results.add(BatchUpdateResultItem.builder()
+                        .progressId(item.getProgressId())
+                        .success(true)
+                        .data(response)
+                        .build());
+            } catch (Exception e) {
+                results.add(BatchUpdateResultItem.builder()
+                        .progressId(item.getProgressId())
+                        .success(false)
+                        .errorMessage(e.getMessage())
+                        .build());
+            }
+        }
+
+        int successCount = (int) results.stream().filter(BatchUpdateResultItem::isSuccess).count();
+        int failureCount = results.size() - successCount;
+
+        return BatchUpdateResponse.builder()
+                .totalCount(results.size())
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .results(results)
+                .build();
+    }
+
+    @Transactional
     public MaterialProgressResponse updateProgress(UUID progressId, MaterialProgressUpdateRequest request, UUID userId) {
         MaterialProgress progress = materialProgressRepository.findById(progressId)
                 .orElseThrow(() -> new IllegalArgumentException("Material progress not found"));
 
         if (!progress.getEnrollment().getUser().getId().equals(userId)) {
             throw new IllegalArgumentException("This progress does not belong to current user");
+        }
+
+        // Idempotent completion: If already COMPLETED, only allow status/completedAt/lastPosition that maintains COMPLETED state
+        if (progress.getStatus() == MaterialProgress.Status.COMPLETED) {
+            // Return current state without modification if trying to downgrade from COMPLETED
+            if (request.getStatus() != null && request.getStatus() != MaterialProgress.Status.COMPLETED) {
+                boolean moduleCompleted = isModuleCompleted(progress.getEnrollment(), progress.getMaterial().getModule());
+                BigDecimal enrollmentProgressPercentage = getEnrollmentProgressPercentage(progress.getEnrollment());
+                return toResponse(progress, moduleCompleted, enrollmentProgressPercentage);
+            }
+            // Allow updating lastPosition even when COMPLETED (for resume functionality)
+            if (request.getLastPosition() != null) {
+                progress.setLastPosition(request.getLastPosition());
+                MaterialProgress saved = materialProgressRepository.save(progress);
+                boolean moduleCompleted = isModuleCompleted(saved.getEnrollment(), saved.getMaterial().getModule());
+                BigDecimal enrollmentProgressPercentage = getEnrollmentProgressPercentage(saved.getEnrollment());
+                return toResponse(saved, moduleCompleted, enrollmentProgressPercentage);
+            }
+            // Return current state without modification
+            boolean moduleCompleted = isModuleCompleted(progress.getEnrollment(), progress.getMaterial().getModule());
+            BigDecimal enrollmentProgressPercentage = getEnrollmentProgressPercentage(progress.getEnrollment());
+            return toResponse(progress, moduleCompleted, enrollmentProgressPercentage);
         }
 
         materialProgressMapper.updateEntityFromRequest(request, progress);
@@ -152,6 +218,26 @@ public class MaterialProgressService {
     }
 
     private boolean syncModuleProgress(Enrollment enrollment, CourseModule module) {
+        boolean moduleCompleted = isModuleCompleted(enrollment, module);
+
+        ModuleProgress moduleProgress = moduleProgressRepository
+                .findByEnrollmentIdAndModuleId(enrollment.getId(), module.getId())
+                .orElseGet(() -> ModuleProgress.builder().enrollment(enrollment).module(module).build());
+        
+        // Idempotent: only update completedAt if transitioning to completed
+        boolean wasCompleted = Boolean.TRUE.equals(moduleProgress.getIsCompleted());
+        moduleProgress.setIsCompleted(moduleCompleted);
+        if (moduleCompleted && !wasCompleted) {
+            moduleProgress.setCompletedAt(LocalDateTime.now());
+        } else if (!moduleCompleted) {
+            moduleProgress.setCompletedAt(null);
+        }
+        moduleProgressRepository.save(moduleProgress);
+
+        return moduleCompleted;
+    }
+
+    private boolean isModuleCompleted(Enrollment enrollment, CourseModule module) {
         List<Material> moduleMaterials = materialRepository.findAllByModuleIdOrderByOrderIndexAsc(module.getId());
         if (moduleMaterials.isEmpty()) {
             return false;
@@ -162,20 +248,17 @@ public class MaterialProgressService {
                 .stream()
                 .collect(Collectors.toMap(mp -> mp.getMaterial().getId(), Function.identity()));
 
-        boolean moduleCompleted = moduleMaterials.stream()
+        return moduleMaterials.stream()
                 .allMatch(material -> {
                     MaterialProgress progress = progressByMaterialId.get(material.getId());
                     return progress != null && progress.getStatus() == MaterialProgress.Status.COMPLETED;
                 });
+    }
 
-        ModuleProgress moduleProgress = moduleProgressRepository
-                .findByEnrollmentIdAndModuleId(enrollment.getId(), module.getId())
-                .orElseGet(() -> ModuleProgress.builder().enrollment(enrollment).module(module).build());
-        moduleProgress.setIsCompleted(moduleCompleted);
-        moduleProgress.setCompletedAt(moduleCompleted ? LocalDateTime.now() : null);
-        moduleProgressRepository.save(moduleProgress);
-
-        return moduleCompleted;
+    private BigDecimal getEnrollmentProgressPercentage(Enrollment enrollment) {
+        return enrollment.getProgressPercentage() != null
+                ? enrollment.getProgressPercentage()
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal recalculateEnrollmentProgress(Enrollment enrollment) {
