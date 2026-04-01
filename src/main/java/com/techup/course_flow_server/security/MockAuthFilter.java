@@ -12,7 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-@Component
+//@Component
 public class MockAuthFilter extends OncePerRequestFilter {
 
     public static final String AUTHENTICATED_USER_ID_ATTR = "authenticatedUserId";
