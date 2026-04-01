@@ -19,8 +19,10 @@ import com.techup.course_flow_server.repository.PromoCodeRepository;
 import com.techup.course_flow_server.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -53,6 +55,8 @@ public class AdminCourseService {
 
     @Transactional
     public CourseAdminDetailResponse createCourse(CreateCourseRequest request, UUID adminUserId) {
+        validateUniqueNames(request);
+
         User admin = userRepository.findById(adminUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Admin user not found"));
 
@@ -63,6 +67,8 @@ public class AdminCourseService {
                 .price(request.getPrice())
                 .totalLearningTime(request.getTotalLearningTime())
                 .coverImageUrl(blankToNull(request.getCoverImageUrl()))
+                .trailerVideoUrl(blankToNull(request.getTrailerVideoUrl()))
+                .attachmentUrl(blankToNull(request.getAttachmentUrl()))
                 .status(Course.Status.DRAFT)
                 .admin(admin)
                 .build();
@@ -259,5 +265,46 @@ public class AdminCourseService {
             return null;
         }
         return value.trim();
+    }
+
+    private void validateUniqueNames(CreateCourseRequest request) {
+        String normalizedCourseTitle = normalizeName(request.getTitle());
+        if (normalizedCourseTitle != null && courseRepository.existsByTitleIgnoreCase(normalizedCourseTitle)) {
+            throw new IllegalArgumentException("Course name already exists");
+        }
+
+        Set<String> lessonNames = new HashSet<>();
+        for (CreateModuleRequest module : request.getModules()) {
+            String lessonName = normalizeName(module.getTitle());
+            if (lessonName == null) {
+                continue;
+            }
+            if (!lessonNames.add(lessonName)) {
+                throw new IllegalArgumentException("Lesson name must be unique within a course");
+            }
+
+            Set<String> subLessonNames = new HashSet<>();
+            for (CreateSubLessonRequest subLesson : module.getSubLessons()) {
+                String subLessonName = normalizeName(subLesson.getTitle());
+                if (subLessonName == null) {
+                    continue;
+                }
+                if (!subLessonNames.add(subLessonName)) {
+                    throw new IllegalArgumentException(
+                            "Sub-lesson name must be unique within the same lesson");
+                }
+            }
+        }
+    }
+
+    private static String normalizeName(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        return trimmed.toLowerCase();
     }
 }
