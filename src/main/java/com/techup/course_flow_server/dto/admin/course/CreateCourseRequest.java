@@ -41,6 +41,15 @@ public class CreateCourseRequest {
     @Min(value = 1, message = "Total learning time must be at least 1 hour")
     private Integer totalLearningTime;
 
+    /** Public URL after cover image upload (e.g. Supabase Storage). */
+    private String coverImageUrl;
+
+    /** Public URL for trailer video (e.g. course_video bucket). */
+    private String trailerVideoUrl;
+
+    /** Public URL for optional attachment (e.g. PDF in course_file bucket). */
+    private String attachmentUrl;
+
     /** Optional — present only when promoEnabled is true in the UI */
     @Valid
     private CreatePromoCodeRequest promoCode;

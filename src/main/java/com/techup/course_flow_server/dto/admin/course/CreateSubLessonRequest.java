@@ -23,4 +23,7 @@ public class CreateSubLessonRequest {
     private Material.FileType fileType;
 
     private String detail;
+
+    /** Public media URL after upload (e.g. Supabase Storage); stored as Material.fileUrl. */
+    private String mediaUrl;
 }

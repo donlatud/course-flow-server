@@ -22,6 +22,7 @@ public class CourseAdminDetailResponse {
     private String detail;
     private BigDecimal price;
     private Integer totalLearningTime;
+    private String coverImageUrl;
     private Course.Status status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -46,6 +47,8 @@ public class CourseAdminDetailResponse {
         private String title;
         private Material.FileType fileType;
         private String detail;
+        /** Stored as file_url in DB (Supabase public URL, etc.). */
+        private String fileUrl;
         private int orderIndex;
     }
 }

@@ -62,6 +62,7 @@ public class AdminCourseService {
                 .detail(request.getDetail())
                 .price(request.getPrice())
                 .totalLearningTime(request.getTotalLearningTime())
+                .coverImageUrl(blankToNull(request.getCoverImageUrl()))
                 .status(Course.Status.DRAFT)
                 .admin(admin)
                 .build();
@@ -102,6 +103,7 @@ public class AdminCourseService {
                         .title(subReq.getTitle())
                         .fileType(subReq.getFileType())
                         .detail(subReq.getDetail())
+                        .fileUrl(blankToNull(subReq.getMediaUrl()))
                         .orderIndex(matIdx + 1)
                         .build();
 
@@ -112,6 +114,7 @@ public class AdminCourseService {
                         .title(material.getTitle())
                         .fileType(material.getFileType())
                         .detail(material.getDetail())
+                        .fileUrl(material.getFileUrl())
                         .orderIndex(material.getOrderIndex())
                         .build());
             }
@@ -189,6 +192,7 @@ public class AdminCourseService {
                                     .title(mat.getTitle())
                                     .fileType(mat.getFileType())
                                     .detail(mat.getDetail())
+                                    .fileUrl(mat.getFileUrl())
                                     .orderIndex(mat.getOrderIndex())
                                     .build())
                             .toList();
@@ -242,10 +246,18 @@ public class AdminCourseService {
                 .detail(course.getDetail())
                 .price(course.getPrice())
                 .totalLearningTime(course.getTotalLearningTime())
+                .coverImageUrl(course.getCoverImageUrl())
                 .status(course.getStatus())
                 .createdAt(course.getCreatedAt())
                 .updatedAt(course.getUpdatedAt())
                 .modules(moduleResponses)
                 .build();
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }
