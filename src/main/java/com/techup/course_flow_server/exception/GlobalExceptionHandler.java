@@ -3,6 +3,7 @@ package com.techup.course_flow_server.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -12,7 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
-public class GlobalExectionHandler {
+public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidationException(
@@ -29,6 +30,18 @@ public class GlobalExectionHandler {
         }
 
         return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, request.getRequestURI());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request) {
+        String message = "A record with the same value already exists";
+        String msg = exception.getMostSpecificCause().getMessage();
+        if (msg != null && msg.contains("uk_courses_title")) {
+            message = "A course with this title already exists";
+        }
+        return build(HttpStatus.CONFLICT, "DUPLICATE_ENTRY", message, request.getRequestURI());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

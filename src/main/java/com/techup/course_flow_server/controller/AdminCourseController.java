@@ -7,6 +7,7 @@ import com.techup.course_flow_server.security.MockAuthFilter;
 import com.techup.course_flow_server.service.AdminCourseService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -36,6 +38,16 @@ public class AdminCourseController {
     @GetMapping
     public List<CourseAdminSummaryResponse> listCourses() {
         return adminCourseService.listCourses();
+    }
+
+    /**
+     * GET /api/admin/courses/exists?title=...
+     * Checks whether a course with the given title already exists (case-insensitive).
+     * Used by the frontend to validate uniqueness before submitting the create form.
+     */
+    @GetMapping("/exists")
+    public Map<String, Boolean> checkTitleExists(@RequestParam String title) {
+        return Map.of("exists", adminCourseService.isTitleTaken(title));
     }
 
     /**
@@ -77,6 +89,6 @@ public class AdminCourseController {
     public void deleteCourse(
             @PathVariable UUID courseId,
             @RequestAttribute(MockAuthFilter.AUTHENTICATED_USER_ID_ATTR) UUID adminUserId) {
-        adminCourseService.deleteCourse(courseId);
+        adminCourseService.deleteCourse(courseId, adminUserId);
     }
 }

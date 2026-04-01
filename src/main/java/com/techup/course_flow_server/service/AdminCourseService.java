@@ -50,16 +50,36 @@ public class AdminCourseService {
     }
 
     // -------------------------------------------------------------------------
+    // GET /api/admin/courses/exists — Check if a course title is already taken
+    // -------------------------------------------------------------------------
+
+    public boolean isTitleTaken(String title) {
+        if (title == null || title.isBlank()) return false;
+        return courseRepository.existsByTitleIgnoreCase(title.trim());
+    }
+
+    // -------------------------------------------------------------------------
     // POST /api/admin/courses — Create a full course (modules + sub-lessons)
     // -------------------------------------------------------------------------
 
     @Transactional
     public CourseAdminDetailResponse createCourse(CreateCourseRequest request, UUID adminUserId) {
         validateUniqueNames(request);
+        User admin = fetchAdmin(adminUserId);
+        Course course = buildAndSaveCourse(request, admin);
+        if (request.getPromoCode() != null) {
+            savePromoCode(request);
+        }
+        List<ModuleResponse> moduleResponses = saveModulesAndMaterials(request.getModules(), course);
+        return buildDetailResponse(course, moduleResponses);
+    }
 
-        User admin = userRepository.findById(adminUserId)
+    private User fetchAdmin(UUID adminUserId) {
+        return userRepository.findById(adminUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Admin user not found"));
+    }
 
+    private Course buildAndSaveCourse(CreateCourseRequest request, User admin) {
         Course course = Course.builder()
                 .title(request.getTitle())
                 .description(request.getDescription())
@@ -72,68 +92,65 @@ public class AdminCourseService {
                 .status(Course.Status.DRAFT)
                 .admin(admin)
                 .build();
+        return courseRepository.save(course);
+    }
 
-        course = courseRepository.save(course);
+    private void savePromoCode(CreateCourseRequest request) {
+        PromoCode promoCode = PromoCode.builder()
+                .code(request.getPromoCode().getCode().trim().toUpperCase())
+                .discountType(request.getPromoCode().getDiscountType())
+                .discountValue(request.getPromoCode().getDiscountValue())
+                .validFrom(request.getPromoCode().getValidFrom())
+                .validUntil(request.getPromoCode().getValidUntil())
+                .build();
+        promoCodeRepository.save(promoCode);
+    }
 
-        // Optional promo code — present only when UI promoEnabled is true
-        if (request.getPromoCode() != null) {
-            PromoCode promoCode = PromoCode.builder()
-                    .code(request.getPromoCode().getCode().trim().toUpperCase())
-                    .discountType(request.getPromoCode().getDiscountType())
-                    .discountValue(request.getPromoCode().getDiscountValue())
-                    .validFrom(request.getPromoCode().getValidFrom())
-                    .validUntil(request.getPromoCode().getValidUntil())
-                    .build();
-            promoCodeRepository.save(promoCode);
-        }
+    private List<ModuleResponse> saveModulesAndMaterials(
+            List<CreateModuleRequest> moduleRequests, Course course) {
 
-        // Persist lessons (modules) and sub-lessons (materials) in order
-        List<ModuleResponse> moduleResponses = new ArrayList<>();
-        for (int moduleIdx = 0; moduleIdx < request.getModules().size(); moduleIdx++) {
-            CreateModuleRequest moduleReq = request.getModules().get(moduleIdx);
-
-            CourseModule module = CourseModule.builder()
+        // 1. Build + saveAll modules in one batch
+        List<CourseModule> moduleEntities = new ArrayList<>();
+        for (int i = 0; i < moduleRequests.size(); i++) {
+            moduleEntities.add(CourseModule.builder()
                     .course(course)
-                    .title(moduleReq.getTitle())
-                    .orderIndex(moduleIdx + 1)
-                    .build();
+                    .title(moduleRequests.get(i).getTitle())
+                    .orderIndex(i + 1)
+                    .build());
+        }
+        List<CourseModule> savedModules = courseModuleRepository.saveAll(moduleEntities);
 
-            module = courseModuleRepository.save(module);
-
-            List<SubLessonResponse> subLessonResponses = new ArrayList<>();
-            for (int matIdx = 0; matIdx < moduleReq.getSubLessons().size(); matIdx++) {
-                CreateSubLessonRequest subReq = moduleReq.getSubLessons().get(matIdx);
-
-                Material material = Material.builder()
-                        .module(module)
+        // 2. Build all materials across all modules, then saveAll in one batch
+        List<Material> allMaterials = new ArrayList<>();
+        for (int moduleIdx = 0; moduleIdx < moduleRequests.size(); moduleIdx++) {
+            CourseModule savedModule = savedModules.get(moduleIdx);
+            List<CreateSubLessonRequest> subLessons = moduleRequests.get(moduleIdx).getSubLessons();
+            for (int matIdx = 0; matIdx < subLessons.size(); matIdx++) {
+                CreateSubLessonRequest subReq = subLessons.get(matIdx);
+                allMaterials.add(Material.builder()
+                        .module(savedModule)
                         .title(subReq.getTitle())
                         .fileType(subReq.getFileType())
                         .detail(subReq.getDetail())
                         .fileUrl(blankToNull(subReq.getMediaUrl()))
                         .orderIndex(matIdx + 1)
-                        .build();
-
-                material = materialRepository.save(material);
-
-                subLessonResponses.add(SubLessonResponse.builder()
-                        .id(material.getId())
-                        .title(material.getTitle())
-                        .fileType(material.getFileType())
-                        .detail(material.getDetail())
-                        .fileUrl(material.getFileUrl())
-                        .orderIndex(material.getOrderIndex())
                         .build());
             }
-
-            moduleResponses.add(ModuleResponse.builder()
-                    .id(module.getId())
-                    .title(module.getTitle())
-                    .orderIndex(module.getOrderIndex())
-                    .subLessons(subLessonResponses)
-                    .build());
         }
+        List<Material> savedMaterials = materialRepository.saveAll(allMaterials);
 
-        return buildDetailResponse(course, moduleResponses);
+        // 3. Group saved materials by moduleId to build responses
+        Map<UUID, List<Material>> materialsByModule = savedMaterials.stream()
+                .collect(Collectors.groupingBy(m -> m.getModule().getId()));
+
+        return savedModules.stream()
+                .map(module -> toModuleResponse(
+                        module,
+                        materialsByModule.getOrDefault(module.getId(), List.of())
+                                .stream()
+                                .map(this::toSubLessonResponse)
+                                .toList()))
+                .toList();
     }
 
     // -------------------------------------------------------------------------
@@ -193,22 +210,9 @@ public class AdminCourseService {
                     List<SubLessonResponse> subs = materialsByModule
                             .getOrDefault(module.getId(), List.of())
                             .stream()
-                            .map(mat -> SubLessonResponse.builder()
-                                    .id(mat.getId())
-                                    .title(mat.getTitle())
-                                    .fileType(mat.getFileType())
-                                    .detail(mat.getDetail())
-                                    .fileUrl(mat.getFileUrl())
-                                    .orderIndex(mat.getOrderIndex())
-                                    .build())
+                            .map(this::toSubLessonResponse)
                             .toList();
-
-                    return ModuleResponse.builder()
-                            .id(module.getId())
-                            .title(module.getTitle())
-                            .orderIndex(module.getOrderIndex())
-                            .subLessons(subs)
-                            .build();
+                    return toModuleResponse(module, subs);
                 })
                 .toList();
 
@@ -220,29 +224,43 @@ public class AdminCourseService {
     // -------------------------------------------------------------------------
 
     @Transactional
-    public void deleteCourse(UUID courseId) {
-        if (!courseRepository.existsById(courseId)) {
-            throw new IllegalArgumentException("Course not found: " + courseId);
+    public void deleteCourse(UUID courseId, UUID requestingAdminId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("Course not found: " + courseId));
+
+        if (course.getAdmin() != null && !course.getAdmin().getId().equals(requestingAdminId)) {
+            throw new IllegalArgumentException("You are not authorized to delete this course");
         }
 
-        // Materials and modules are deleted via cascading in the service layer
-        // (no CascadeType on entity, so we delete explicitly)
-        List<CourseModule> modules = courseModuleRepository.findAllByCourseIdOrderByOrderIndexAsc(courseId);
-        List<UUID> moduleIds = modules.stream().map(CourseModule::getId).toList();
-
-        if (!moduleIds.isEmpty()) {
-            List<Material> materials =
-                    materialRepository.findAllByModuleIdInOrderByModuleOrderIndexAscOrderIndexAsc(moduleIds);
-            materialRepository.deleteAll(materials);
-            courseModuleRepository.deleteAll(modules);
-        }
-
+        // Bulk delete: materials first (FK constraint), then modules, then course
+        materialRepository.deleteByCourseId(courseId);
+        courseModuleRepository.deleteByCourseId(courseId);
         courseRepository.deleteById(courseId);
     }
 
     // -------------------------------------------------------------------------
     // helpers
     // -------------------------------------------------------------------------
+
+    private SubLessonResponse toSubLessonResponse(Material material) {
+        return SubLessonResponse.builder()
+                .id(material.getId())
+                .title(material.getTitle())
+                .fileType(material.getFileType())
+                .detail(material.getDetail())
+                .fileUrl(material.getFileUrl())
+                .orderIndex(material.getOrderIndex())
+                .build();
+    }
+
+    private ModuleResponse toModuleResponse(CourseModule module, List<SubLessonResponse> subLessons) {
+        return ModuleResponse.builder()
+                .id(module.getId())
+                .title(module.getTitle())
+                .orderIndex(module.getOrderIndex())
+                .subLessons(subLessons)
+                .build();
+    }
 
     private CourseAdminDetailResponse buildDetailResponse(Course course, List<ModuleResponse> moduleResponses) {
         return CourseAdminDetailResponse.builder()
@@ -253,6 +271,8 @@ public class AdminCourseService {
                 .price(course.getPrice())
                 .totalLearningTime(course.getTotalLearningTime())
                 .coverImageUrl(course.getCoverImageUrl())
+                .trailerVideoUrl(course.getTrailerVideoUrl())
+                .attachmentUrl(course.getAttachmentUrl())
                 .status(course.getStatus())
                 .createdAt(course.getCreatedAt())
                 .updatedAt(course.getUpdatedAt())

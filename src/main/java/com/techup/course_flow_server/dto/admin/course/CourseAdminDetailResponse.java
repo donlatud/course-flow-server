@@ -23,6 +23,8 @@ public class CourseAdminDetailResponse {
     private BigDecimal price;
     private Integer totalLearningTime;
     private String coverImageUrl;
+    private String trailerVideoUrl;
+    private String attachmentUrl;
     private Course.Status status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
