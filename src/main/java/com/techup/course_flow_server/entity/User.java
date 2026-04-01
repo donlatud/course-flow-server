@@ -28,8 +28,7 @@ import org.hibernate.annotations.UuidGenerator;
 public class User {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator
+    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID id;
 
     @Column(nullable = false, unique = true)
