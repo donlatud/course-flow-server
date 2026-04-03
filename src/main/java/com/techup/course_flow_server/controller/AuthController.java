@@ -1,5 +1,6 @@
 package com.techup.course_flow_server.controller;
 
+import com.techup.course_flow_server.dto.auth.AdminLoginResponse;
 import com.techup.course_flow_server.dto.auth.AuthResponse;
 import com.techup.course_flow_server.dto.auth.LoginRequest;
 import com.techup.course_flow_server.dto.auth.RegisterRequest;
@@ -23,6 +24,11 @@ public class AuthController {
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/admin-login")
+    public AdminLoginResponse adminLogin(@Valid @RequestBody LoginRequest request) {
+        return authService.adminLogin(request);
     }
 
     @PostMapping("/register")
