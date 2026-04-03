@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -42,6 +43,16 @@ public class GlobalExceptionHandler {
             message = "A course with this title already exists";
         }
         return build(HttpStatus.CONFLICT, "DUPLICATE_ENTRY", message, request.getRequestURI());
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiErrorResponse> handleResponseStatusException(
+            ResponseStatusException exception,
+            HttpServletRequest request) {
+        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
+        if (status == null) status = HttpStatus.INTERNAL_SERVER_ERROR;
+        String code = status == HttpStatus.FORBIDDEN ? "FORBIDDEN" : status.name();
+        return build(status, code, exception.getReason(), request.getRequestURI());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

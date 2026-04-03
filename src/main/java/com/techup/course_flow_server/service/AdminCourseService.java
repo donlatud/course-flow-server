@@ -7,6 +7,7 @@ import com.techup.course_flow_server.dto.admin.course.CourseAdminSummaryResponse
 import com.techup.course_flow_server.dto.admin.course.CreateCourseRequest;
 import com.techup.course_flow_server.dto.admin.course.CreateModuleRequest;
 import com.techup.course_flow_server.dto.admin.course.CreateSubLessonRequest;
+import com.techup.course_flow_server.dto.admin.course.UpdateCourseRequest;
 import com.techup.course_flow_server.entity.Course;
 import com.techup.course_flow_server.entity.CourseModule;
 import com.techup.course_flow_server.entity.Material;
@@ -25,7 +26,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AdminCourseService {
@@ -75,8 +78,12 @@ public class AdminCourseService {
     }
 
     private User fetchAdmin(UUID adminUserId) {
-        return userRepository.findById(adminUserId)
-                .orElseThrow(() -> new IllegalArgumentException("Admin user not found"));
+        User user = userRepository.findById(adminUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required"));
+        if (user.getRole() != User.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
+        }
+        return user;
     }
 
     private Course buildAndSaveCourse(CreateCourseRequest request, User admin) {
@@ -220,16 +227,61 @@ public class AdminCourseService {
     }
 
     // -------------------------------------------------------------------------
+    // PUT /api/admin/courses/{id} — Update course (replaces modules + materials)
+    // -------------------------------------------------------------------------
+
+    @Transactional
+    public CourseAdminDetailResponse updateCourse(UUID courseId, UpdateCourseRequest request, UUID adminUserId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("Course not found: " + courseId));
+
+        fetchAdmin(adminUserId);
+
+        if (course.getAdmin() != null && !course.getAdmin().getId().equals(adminUserId)) {
+            throw new IllegalArgumentException("You are not authorized to update this course");
+        }
+
+        // Title uniqueness check only when title actually changed
+        if (!course.getTitle().equalsIgnoreCase(request.getTitle())) {
+            if (courseRepository.existsByTitleIgnoreCase(request.getTitle().trim())) {
+                throw new IllegalArgumentException("Course name already exists");
+            }
+        }
+
+        course.setTitle(request.getTitle().trim());
+        course.setDescription(request.getDescription());
+        course.setDetail(request.getDetail());
+        course.setPrice(request.getPrice());
+        course.setTotalLearningTime(request.getTotalLearningTime());
+        course.setCoverImageUrl(blankToNull(request.getCoverImageUrl()));
+        course.setTrailerVideoUrl(blankToNull(request.getTrailerVideoUrl()));
+        course.setAttachmentUrl(blankToNull(request.getAttachmentUrl()));
+        courseRepository.save(course);
+
+        // Replace all modules + materials
+        materialRepository.deleteByCourseId(courseId);
+        courseModuleRepository.deleteByCourseId(courseId);
+
+        List<ModuleResponse> moduleResponses = (request.getModules() == null || request.getModules().isEmpty())
+                ? List.of()
+                : saveModulesAndMaterials(request.getModules(), course);
+
+        return buildDetailResponse(course, moduleResponses);
+    }
+
+    // -------------------------------------------------------------------------
     // DELETE /api/admin/courses/{id}
     // -------------------------------------------------------------------------
 
     @Transactional
     public void deleteCourse(UUID courseId, UUID requestingAdminId) {
+        fetchAdmin(requestingAdminId);
+
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found: " + courseId));
 
         if (course.getAdmin() != null && !course.getAdmin().getId().equals(requestingAdminId)) {
-            throw new IllegalArgumentException("You are not authorized to delete this course");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this course");
         }
 
         // Bulk delete: materials first (FK constraint), then modules, then course
