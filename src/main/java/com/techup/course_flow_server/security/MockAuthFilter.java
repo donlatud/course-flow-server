@@ -20,6 +20,12 @@ public class MockAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
+        // Always allow CORS preflight requests (OPTIONS) to pass through
+        // so that browsers can perform the CORS handshake successfully.
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
         return !path.startsWith("/api/");
     }
 
