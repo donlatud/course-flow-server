@@ -4,7 +4,6 @@ import com.techup.course_flow_server.dto.admin.course.CourseAdminDetailResponse;
 import com.techup.course_flow_server.dto.admin.course.CourseAdminSummaryResponse;
 import com.techup.course_flow_server.dto.admin.course.CreateCourseRequest;
 import com.techup.course_flow_server.dto.admin.course.UpdateCourseRequest;
-import com.techup.course_flow_server.security.MockAuthFilter;
 import com.techup.course_flow_server.service.AdminCourseService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -78,7 +77,7 @@ public class AdminCourseController {
     @ResponseStatus(HttpStatus.CREATED)
     public CourseAdminDetailResponse createCourse(
             @Valid @RequestBody CreateCourseRequest request,
-            @RequestAttribute(MockAuthFilter.AUTHENTICATED_USER_ID_ATTR) UUID adminUserId) {
+            @RequestAttribute("authenticatedUserId") UUID adminUserId) {
         return adminCourseService.createCourse(request, adminUserId);
     }
 
@@ -90,7 +89,7 @@ public class AdminCourseController {
     public CourseAdminDetailResponse updateCourse(
             @PathVariable UUID courseId,
             @Valid @RequestBody UpdateCourseRequest request,
-            @RequestAttribute(MockAuthFilter.AUTHENTICATED_USER_ID_ATTR) UUID adminUserId) {
+            @RequestAttribute("authenticatedUserId") UUID adminUserId) {
         return adminCourseService.updateCourse(courseId, request, adminUserId);
     }
 
@@ -102,7 +101,7 @@ public class AdminCourseController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCourse(
             @PathVariable UUID courseId,
-            @RequestAttribute(MockAuthFilter.AUTHENTICATED_USER_ID_ATTR) UUID adminUserId) {
+            @RequestAttribute("authenticatedUserId") UUID adminUserId) {
         adminCourseService.deleteCourse(courseId, adminUserId);
     }
 }
