@@ -2,7 +2,6 @@ package com.techup.course_flow_server.controller;
 
 import com.techup.course_flow_server.entity.User;
 import com.techup.course_flow_server.repository.UserRepository;
-import com.techup.course_flow_server.security.MockAuthFilter;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,7 +22,7 @@ public class UserController {
 
     @GetMapping("/me")
     public User getMe(
-            @RequestAttribute(MockAuthFilter.AUTHENTICATED_USER_ID_ATTR) UUID userId) {
+            @RequestAttribute("authenticatedUserId") UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }

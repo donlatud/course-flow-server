@@ -75,12 +75,18 @@ public class CourseLearningService {
         Map<UUID, MaterialProgress> progressByMaterialId = materialProgressRepository
                 .findAllByEnrollmentId(enrollment.getId())
                 .stream()
-                .collect(Collectors.toMap(mp -> mp.getMaterial().getId(), Function.identity()));
+                .collect(Collectors.toMap(
+                        mp -> mp.getMaterial().getId(),
+                        Function.identity(),
+                        (a, b) -> a));
 
         Map<UUID, ModuleProgress> moduleProgressByModuleId = moduleProgressRepository
                 .findAllByEnrollmentId(enrollment.getId())
                 .stream()
-                .collect(Collectors.toMap(mp -> mp.getModule().getId(), Function.identity()));
+                .collect(Collectors.toMap(
+                        mp -> mp.getModule().getId(),
+                        Function.identity(),
+                        (a, b) -> a));
 
         List<ModuleLearningResponse> moduleResponses = modules.stream()
                 .map(module -> mapModule(module, materialsByModuleId, progressByMaterialId, moduleProgressByModuleId))
@@ -130,7 +136,7 @@ public class CourseLearningService {
         ModuleProgress moduleProgress = moduleProgressByModuleId.get(module.getId());
         boolean isCompletedFromProgress = moduleProgress != null && Boolean.TRUE.equals(moduleProgress.getIsCompleted());
         boolean isCompletedFromMaterials = !materialResponses.isEmpty()
-                && materialResponses.stream().allMatch(MaterialLearningResponse::getCompleted);
+                && materialResponses.stream().allMatch(m -> Boolean.TRUE.equals(m.getCompleted()));
 
         return ModuleLearningResponse.builder()
                 .moduleId(module.getId())
