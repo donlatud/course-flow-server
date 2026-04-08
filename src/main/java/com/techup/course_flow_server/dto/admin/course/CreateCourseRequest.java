@@ -1,5 +1,6 @@
 package com.techup.course_flow_server.dto.admin.course;
 
+import com.techup.course_flow_server.entity.Course;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -49,6 +50,9 @@ public class CreateCourseRequest {
 
     /** Public URL for optional attachment (e.g. PDF in course_file bucket). */
     private String attachmentUrl;
+
+    /** Optional course status. Defaults to DRAFT when omitted. */
+    private Course.Status status;
 
     /** Optional — present only when promoEnabled is true in the UI */
     @Valid

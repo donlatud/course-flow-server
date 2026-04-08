@@ -6,7 +6,6 @@ import com.techup.course_flow_server.dto.admin.course.CreateCourseRequest;
 import com.techup.course_flow_server.dto.admin.course.UpdateCourseRequest;
 import com.techup.course_flow_server.service.AdminCourseService;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -22,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.data.domain.Page;
 
 @RestController
 @RequestMapping("/api/admin/courses")
@@ -33,11 +33,28 @@ public class AdminCourseController {
         this.adminCourseService = adminCourseService;
     }
 
+    /**
+     * GET /api/admin/courses?page=0&size=10&search=
+     * Paginated list for the admin course table. {@code page} is 0-based.
+     * Optional {@code search} filters by course title (case-insensitive, contains).
+     * Optional {@code sortBy}: title, status, price, createdAt, updatedAt, lessonCount (default createdAt).
+     * Optional {@code sortDir}: asc or desc (default desc).
+     */
     @GetMapping
-    public List<CourseAdminSummaryResponse> listCourses() {
-        return adminCourseService.listCourses();
+    public Page<CourseAdminSummaryResponse> listCourses(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDir) {
+        return adminCourseService.listCourses(page, size, search, sortBy, sortDir);
     }
 
+    /**
+     * GET /api/admin/courses/exists?title=...
+     * Checks whether a course with the given title already exists (case-insensitive).
+     * Used by the frontend to validate uniqueness before submitting the create form.
+     */
     @GetMapping("/exists")
     public Map<String, Boolean> checkTitleExists(@RequestParam String title) {
         return Map.of("exists", adminCourseService.isTitleTaken(title));
