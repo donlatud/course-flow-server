@@ -30,6 +30,12 @@ import org.hibernate.annotations.UuidGenerator;
 @AllArgsConstructor
 public class Order {
 
+    /**
+     * Pending orders expire 60 minutes after creation.
+     * This value is used by service-layer lazy expiry checks.
+     */
+    private static final long EXPIRY_MINUTES = 60L;
+
     @Id
     @GeneratedValue
     @UuidGenerator
@@ -55,9 +61,36 @@ public class Order {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
+    /**
+     * Returns the timestamp after which this order should no longer be used
+     * for payment attempts.
+     */
+    public LocalDateTime getExpiresAt() {
+        if (expiresAt != null) {
+            return expiresAt;
+        }
+        return createdAt == null ? null : createdAt.plusMinutes(EXPIRY_MINUTES);
+    }
+
+    /**
+     * Helper used by services to lazily detect expired pending orders without
+     * requiring a dedicated expires_at column in the first phase.
+     */
+    public boolean isExpiredAt(LocalDateTime referenceTime) {
+        if (status != Status.PENDING || createdAt == null || referenceTime == null) {
+            return false;
+        }
+
+        return !referenceTime.isBefore(createdAt.plusMinutes(EXPIRY_MINUTES));
+    }
+
     public enum Status {
         PENDING,
         COMPLETED,
-        FAILED
+        FAILED,
+        EXPIRED
     }
 }

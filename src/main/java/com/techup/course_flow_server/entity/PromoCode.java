@@ -44,6 +44,14 @@ public class PromoCode {
     @Column(name = "usage_limit")
     private Integer usageLimit;
 
+    /**
+     * Tracks how many successful redemptions have been recorded system-wide.
+     * User-level one-time usage is enforced through the promo_redemptions table.
+     */
+    @Column(name = "usage_count", nullable = false)
+    @Builder.Default
+    private Integer usageCount = 0;
+
     @Column(name = "valid_from")
     private LocalDateTime validFrom;
 
