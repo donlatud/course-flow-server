@@ -4,11 +4,14 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -57,6 +60,10 @@ public class PromoCode {
 
     @Column(name = "valid_until")
     private LocalDateTime validUntil;
+
+    @OneToMany(mappedBy = "promoCode")
+    @Builder.Default
+    private Set<PromoCodeCourse> promoCodeCourses = new HashSet<>();
 
     public enum DiscountType {
         PERCENTAGE,

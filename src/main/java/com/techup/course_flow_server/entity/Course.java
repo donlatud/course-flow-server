@@ -108,6 +108,10 @@ public class Course {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @OneToMany(mappedBy = "course")
+    @Builder.Default
+    private Set<PromoCodeCourse> promoCodeCourses = new HashSet<>();
+
     public enum Status {
         DRAFT,
         PUBLISHED,
