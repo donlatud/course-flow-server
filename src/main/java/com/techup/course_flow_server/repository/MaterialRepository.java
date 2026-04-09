@@ -15,6 +15,14 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
     List<Material> findAllByModuleIdOrderByOrderIndexAsc(UUID moduleId);
 
     /**
+     * Finds all materials for a given course, ordered by module order index and material order index.
+     */
+    @Query("SELECT m FROM Material m " +
+           "WHERE m.module.course.id = :courseId " +
+           "ORDER BY m.module.orderIndex ASC, m.orderIndex ASC")
+    List<Material> findAllByCourseIdOrderByModuleOrderIndexAscOrderIndexAsc(@Param("courseId") UUID courseId);
+
+    /**
      * Bulk-deletes all materials belonging to a course in a single SQL statement,
      * without loading any entities into memory.
      */
