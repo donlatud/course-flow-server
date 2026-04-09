@@ -48,8 +48,7 @@ public class MaterialProgressController {
             @Valid @RequestBody MaterialProgressUpdateRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
-        
-        // Rate limit: max 1 request per 10 seconds per user
+
         String rateLimitKey = rateLimitService.buildMaterialProgressUpdateKey(userId);
         if (!rateLimitService.isAllowed(rateLimitKey, 1, 10)) {
             throw new ResponseStatusException(

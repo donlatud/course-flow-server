@@ -28,8 +28,8 @@ public class AuthService {
     private final RestTemplate restTemplate;
 
     public AuthService(SupabaseProperties supabaseProperties,
-                       UserService userService,
-                       UserRepository userRepository) {
+            UserService userService,
+            UserRepository userRepository) {
         this.supabaseProperties = supabaseProperties;
         this.userService = userService;
         this.userRepository = userRepository;
@@ -46,26 +46,23 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         String url = supabaseProperties.url() + "/auth/v1/token?grant_type=password";
         Map<String, String> body = Map.of(
-            "email", request.email(),
-            "password", request.password()
-        );
+                "email", request.email(),
+                "password", request.password());
         HttpEntity<Map<String, String>> entity = new HttpEntity<>(body, headers());
         Map response = restTemplate.postForObject(url, entity, Map.class);
         return new AuthResponse(
-            (String) response.get("access_token"),
-            (String) response.get("refresh_token"),
-            (String) response.get("token_type"),
-            Long.valueOf(response.get("expires_in").toString())
-        );
+                (String) response.get("access_token"),
+                (String) response.get("refresh_token"),
+                (String) response.get("token_type"),
+                Long.valueOf(response.get("expires_in").toString()));
     }
 
     public AdminLoginResponse adminLogin(LoginRequest request) {
         // 1. Authenticate with Supabase
         String url = supabaseProperties.url() + "/auth/v1/token?grant_type=password";
         Map<String, String> body = Map.of(
-            "email", request.email(),
-            "password", request.password()
-        );
+                "email", request.email(),
+                "password", request.password());
         HttpEntity<Map<String, String>> entity = new HttpEntity<>(body, headers());
 
         Map supabaseResponse;
@@ -104,39 +101,49 @@ public class AuthService {
     }
 
     public AuthResponse register(RegisterRequest request) {
-        String url = supabaseProperties.url() + "/auth/v1/signup";
-        Map<String, String> body = Map.of(
-            "email", request.email(),
-            "password", request.password()
-        );
-        HttpEntity<Map<String, String>> entity = new HttpEntity<>(body, headers());
-        Map response = restTemplate.postForObject(url, entity, Map.class);
+        try {
+            String url = supabaseProperties.url() + "/auth/v1/signup";
+            Map<String, String> body = Map.of(
+                    "email", request.email(),
+                    "password", request.password());
+            HttpEntity<Map<String, String>> entity = new HttpEntity<>(body, headers());
+            Map response = restTemplate.postForObject(url, entity, Map.class);
 
-        Map userMap = (Map) response.get("user");
-        String supabaseUserId = (String) userMap.get("id");
+            Map userMap = (Map) response.get("user");
+            String supabaseUserId = (String) userMap.get("id");
 
-        userService.createUser(request, supabaseUserId);
+            userService.createUser(request, supabaseUserId);
 
-        return new AuthResponse(
-            (String) response.get("access_token"),
-            (String) response.get("refresh_token"),
-            (String) response.get("token_type"),
-            response.get("expires_in") != null
-                ? Long.valueOf(response.get("expires_in").toString()) : null
-        );
+            return new AuthResponse(
+                    (String) response.get("access_token"),
+                    (String) response.get("refresh_token"),
+                    (String) response.get("token_type"),
+                    response.get("expires_in") != null
+                            ? Long.valueOf(response.get("expires_in").toString())
+                            : null);
+        } catch (HttpClientErrorException ex) {
+            String body = ex.getResponseBodyAsString();
+            if (body.contains("already registered") || body.contains("user_already_exists")) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Register failed");
+        }
     }
 
     private UUID extractSubFromJwt(String token) {
         try {
             String[] parts = token.split("\\.");
-            if (parts.length < 2) return null;
+            if (parts.length < 2)
+                return null;
             byte[] payloadBytes = Base64.getUrlDecoder().decode(addPadding(parts[1]));
             String payload = new String(payloadBytes);
             int subStart = payload.indexOf("\"sub\":\"");
-            if (subStart == -1) return null;
+            if (subStart == -1)
+                return null;
             int valueStart = subStart + 7;
             int valueEnd = payload.indexOf("\"", valueStart);
-            if (valueEnd == -1) return null;
+            if (valueEnd == -1)
+                return null;
             return UUID.fromString(payload.substring(valueStart, valueEnd));
         } catch (Exception ex) {
             return null;
@@ -145,8 +152,10 @@ public class AuthService {
 
     private String addPadding(String base64) {
         int mod = base64.length() % 4;
-        if (mod == 2) return base64 + "==";
-        if (mod == 3) return base64 + "=";
+        if (mod == 2)
+            return base64 + "==";
+        if (mod == 3)
+            return base64 + "=";
         return base64;
     }
 }
