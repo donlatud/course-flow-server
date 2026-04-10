@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -28,10 +29,11 @@ import org.springframework.stereotype.Service;
  * Core checkout order logic for the payment flow.
  *
  * Responsibilities:
- * - create a new pending order
- * - reuse the latest pending order when still valid
- * - lazily mark expired pending orders as EXPIRED
- * - recalculate promo pricing on reused orders
+ * - expire only PENDING orders that are past {@link Order#getExpiresAt()} (same
+ *   rules as {@link Order#isExpiredAt})
+ * - reuse the latest still-valid PENDING order for the same user+course;
+ *   otherwise create a new order
+ * - lazily mark expired pending orders as EXPIRED on read (get order / status)
  */
 @Service
 public class OrderService {
@@ -62,8 +64,8 @@ public class OrderService {
     }
 
     /**
-     * Creates a brand-new order or reuses the user's latest valid pending order
-     * for the same course.
+     * Expires stale PENDING rows (past {@code expires_at}), then reuses the
+     * latest still-valid PENDING order for this course or creates a new one.
      */
     @Transactional
     public OrderResponse createOrReuseOrder(UUID userId, CreateOrderRequest request) {
@@ -72,12 +74,32 @@ public class OrderService {
 
         ensureUserDoesNotAlreadyOwnCourse(userId, course.getId());
 
+        LocalDateTime now = LocalDateTime.now();
+
+        /*
+         * Only flip rows that are actually past expiry (aligned with expires_at /
+         * created_at + window). Bulk UPDATE keeps one round-trip; clearAutomatically
+         * avoids stale persistence context before findLatest.
+         */
+        List<Order> pendingForCourse =
+                orderRepository.findAllByUserIdAndCourseIdAndStatus(userId, course.getId(), Order.Status.PENDING);
+
+        List<UUID> staleIds =
+                pendingForCourse.stream().filter(o -> o.isExpiredAt(now)).map(Order::getId).toList();
+        if (!staleIds.isEmpty()) {
+            orderRepository.expirePendingByIds(staleIds, Order.Status.PENDING, Order.Status.EXPIRED);
+        }
+
         Order reusableOrder = orderRepository
                 .findLatestByUserIdAndCourseIdAndStatus(userId, course.getId(), Order.Status.PENDING)
                 .orElse(null);
 
-        if (reusableOrder != null && !markExpiredIfNeeded(reusableOrder)) {
+        if (reusableOrder != null && !reusableOrder.isExpiredAt(now)) {
             return updateReusableOrder(reusableOrder, course, request.promoCode());
+        }
+
+        if (reusableOrder != null) {
+            markExpiredIfNeeded(reusableOrder);
         }
 
         return createNewOrder(user, course, request.promoCode());
