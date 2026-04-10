@@ -76,15 +76,26 @@ public class Order {
     }
 
     /**
-     * Helper used by services to lazily detect expired pending orders without
-     * requiring a dedicated expires_at column in the first phase.
+     * Whether this pending order is past its expiry instant.
+     * <p>
+     * Uses the same instant as {@link #getExpiresAt()} (persisted {@code expires_at}
+     * when set, otherwise {@code created_at + EXPIRY_MINUTES}) so checks match what
+     * APIs return to clients.
+     * <p>
+     * <strong>DB note:</strong> status does not flip to {@link Status#EXPIRED} by
+     * itself when clock time passes — there is no scheduler. A row stays
+     * {@code PENDING} until some service call runs {@code markExpiredIfNeeded} /
+     * payment flow (lazy expiry), or you add a scheduled job later.
      */
     public boolean isExpiredAt(LocalDateTime referenceTime) {
-        if (status != Status.PENDING || createdAt == null || referenceTime == null) {
+        if (status != Status.PENDING || referenceTime == null) {
             return false;
         }
-
-        return !referenceTime.isBefore(createdAt.plusMinutes(EXPIRY_MINUTES));
+        LocalDateTime expires = getExpiresAt();
+        if (expires == null) {
+            return false;
+        }
+        return !referenceTime.isBefore(expires);
     }
 
     public enum Status {

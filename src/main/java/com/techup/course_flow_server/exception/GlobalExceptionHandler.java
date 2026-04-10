@@ -37,10 +37,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
             DataIntegrityViolationException exception,
             HttpServletRequest request) {
-        String message = "A record with the same value already exists";
         String msg = exception.getMostSpecificCause().getMessage();
+        String message;
         if (msg != null && msg.contains("uk_courses_title")) {
             message = "A course with this title already exists";
+        } else if (msg != null) {
+            String oneLine = msg.replaceAll("\\s+", " ").trim();
+            if (oneLine.length() > 300) {
+                oneLine = oneLine.substring(0, 297) + "...";
+            }
+            message = oneLine;
+        } else {
+            message = "A record with the same value already exists";
         }
         return build(HttpStatus.CONFLICT, "DUPLICATE_ENTRY", message, request.getRequestURI());
     }
