@@ -44,6 +44,9 @@ public class PromoCode {
     @Column(name = "discount_value", precision = 10, scale = 2, nullable = false)
     private BigDecimal discountValue;
 
+    @Column(name = "minimum_purchase_amount", precision = 10, scale = 2)
+    private BigDecimal minimumPurchaseAmount;
+
     @Column(name = "usage_limit")
     private Integer usageLimit;
 
