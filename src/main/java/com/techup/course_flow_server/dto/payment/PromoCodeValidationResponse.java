@@ -25,6 +25,10 @@ public class PromoCodeValidationResponse {
         EXPIRED,
         USAGE_LIMIT_REACHED,
         ALREADY_USED,
-        INVALID
+        INVALID,
+        /** Course price must be greater than 200 THB to use promo codes */
+        COURSE_PRICE_TOO_LOW,
+        /** Final price after discount must be at least 100 THB */
+        FINAL_PRICE_TOO_LOW
     }
 }
