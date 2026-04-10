@@ -6,19 +6,23 @@ import com.techup.course_flow_server.dto.admin.course.CourseAdminDetailResponse.
 import com.techup.course_flow_server.dto.admin.course.CourseAdminSummaryResponse;
 import com.techup.course_flow_server.dto.admin.course.CreateCourseRequest;
 import com.techup.course_flow_server.dto.admin.course.CreateModuleRequest;
+import com.techup.course_flow_server.dto.admin.course.CreatePromoCodeRequest;
 import com.techup.course_flow_server.dto.admin.course.CreateSubLessonRequest;
 import com.techup.course_flow_server.dto.admin.course.UpdateCourseRequest;
 import com.techup.course_flow_server.entity.Course;
 import com.techup.course_flow_server.entity.CourseModule;
 import com.techup.course_flow_server.entity.Material;
 import com.techup.course_flow_server.entity.PromoCode;
+import com.techup.course_flow_server.entity.PromoCodeCourse;
 import com.techup.course_flow_server.entity.User;
 import com.techup.course_flow_server.repository.CourseModuleRepository;
 import com.techup.course_flow_server.repository.CourseRepository;
 import com.techup.course_flow_server.repository.MaterialRepository;
+import com.techup.course_flow_server.repository.PromoCodeCourseRepository;
 import com.techup.course_flow_server.repository.PromoCodeRepository;
 import com.techup.course_flow_server.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -42,6 +46,7 @@ public class AdminCourseService {
     private final CourseModuleRepository courseModuleRepository;
     private final MaterialRepository materialRepository;
     private final PromoCodeRepository promoCodeRepository;
+    private final PromoCodeCourseRepository promoCodeCourseRepository;
     private final UserRepository userRepository;
 
     public AdminCourseService(
@@ -49,11 +54,13 @@ public class AdminCourseService {
             CourseModuleRepository courseModuleRepository,
             MaterialRepository materialRepository,
             PromoCodeRepository promoCodeRepository,
+            PromoCodeCourseRepository promoCodeCourseRepository,
             UserRepository userRepository) {
         this.courseRepository = courseRepository;
         this.courseModuleRepository = courseModuleRepository;
         this.materialRepository = materialRepository;
         this.promoCodeRepository = promoCodeRepository;
+        this.promoCodeCourseRepository = promoCodeCourseRepository;
         this.userRepository = userRepository;
     }
 
@@ -76,7 +83,7 @@ public class AdminCourseService {
         User admin = fetchAdmin(adminUserId);
         Course course = buildAndSaveCourse(request, admin);
         if (request.getPromoCode() != null) {
-            savePromoCode(request);
+            savePromoCode(request, course);
         }
         List<ModuleResponse> moduleResponses = saveModulesAndMaterials(request.getModules(), course);
         return buildDetailResponse(course, moduleResponses);
@@ -107,7 +114,9 @@ public class AdminCourseService {
         return courseRepository.save(course);
     }
 
-    private void savePromoCode(CreateCourseRequest request) {
+    private void savePromoCode(CreateCourseRequest request, Course createdCourse) {
+        validatePromoDiscount(request.getPromoCode());
+
         PromoCode promoCode = PromoCode.builder()
                 .code(request.getPromoCode().getCode().trim().toUpperCase())
                 .discountType(request.getPromoCode().getDiscountType())
@@ -115,7 +124,45 @@ public class AdminCourseService {
                 .validFrom(request.getPromoCode().getValidFrom())
                 .validUntil(request.getPromoCode().getValidUntil())
                 .build();
-        promoCodeRepository.save(promoCode);
+        PromoCode savedPromoCode = promoCodeRepository.save(promoCode);
+
+        List<UUID> requestedCourseIds = request.getPromoCode().getCourseIds();
+        List<Course> applicableCourses;
+        if (requestedCourseIds == null || requestedCourseIds.isEmpty()) {
+            // Backward-compatible behavior for old payloads from course-create flow.
+            applicableCourses = List.of(createdCourse);
+        } else {
+            applicableCourses = courseRepository.findAllById(requestedCourseIds);
+            if (applicableCourses.size() != new HashSet<>(requestedCourseIds).size()) {
+                throw new IllegalArgumentException("One or more courseIds are invalid");
+            }
+        }
+
+        List<PromoCodeCourse> mappings = applicableCourses.stream()
+                .map(course -> PromoCodeCourse.builder()
+                        .promoCode(savedPromoCode)
+                        .course(course)
+                        .build())
+                .toList();
+        promoCodeCourseRepository.saveAll(mappings);
+    }
+
+    private void validatePromoDiscount(CreatePromoCodeRequest promoRequest) {
+        if (promoRequest.getDiscountValue() == null || promoRequest.getDiscountType() == null) {
+            return;
+        }
+
+        BigDecimal value = promoRequest.getDiscountValue();
+        if (value.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Discount value must be at least 0");
+        }
+
+        if (promoRequest.getDiscountType() == PromoCode.DiscountType.PERCENTAGE
+                && value.compareTo(new BigDecimal("100")) > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Percent discount must be between 0 and 100");
+        }
     }
 
     private List<ModuleResponse> saveModulesAndMaterials(

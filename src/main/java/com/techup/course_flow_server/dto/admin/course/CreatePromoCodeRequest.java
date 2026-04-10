@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,10 +28,16 @@ public class CreatePromoCodeRequest {
     private PromoCode.DiscountType discountType;
 
     @NotNull(message = "Discount value is required")
-    @DecimalMin(value = "0.01", message = "Discount value must be greater than 0")
+    @DecimalMin(value = "0.00", inclusive = true, message = "Discount value must be at least 0")
     private BigDecimal discountValue;
 
     private LocalDateTime validFrom;
 
     private LocalDateTime validUntil;
+
+    /**
+     * Optional list of course IDs that this promo code can be applied to.
+     * If omitted in course-create flow, service will link it to the created course.
+     */
+    private List<UUID> courseIds;
 }
