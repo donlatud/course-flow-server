@@ -1,19 +1,20 @@
 package com.techup.course_flow_server.controller;
 
 import com.techup.course_flow_server.dto.upload.UploadUrlResponse;
-import com.techup.course_flow_server.security.MockAuthFilter;
 import com.techup.course_flow_server.upload.FileUploadService;
 import com.techup.course_flow_server.upload.ImageUploadService;
 import com.techup.course_flow_server.upload.VideoUploadService;
-import java.util.Objects;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
@@ -33,6 +34,17 @@ public class AdminUploadController {
         this.fileUploadService = fileUploadService;
     }
 
+    private static UUID adminUserIdFromJwt(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        try {
+            return UUID.fromString(jwt.getSubject());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid user id in token");
+        }
+    }
+
     /**
      * Multipart: {@code file}, {@code courseFolderId}, {@code kind}=COVER|SUBLESSON, optional {@code lessonId},
      * {@code subLessonId} for SUBLESSON.
@@ -44,8 +56,8 @@ public class AdminUploadController {
             @RequestParam(value = "kind", defaultValue = "COVER") String kind,
             @RequestParam(value = "lessonId", required = false) Integer lessonId,
             @RequestParam(value = "subLessonId", required = false) Integer subLessonId,
-            @RequestAttribute(MockAuthFilter.AUTHENTICATED_USER_ID_ATTR) UUID adminUserId) {
-        Objects.requireNonNull(adminUserId, "authenticated admin");
+            @AuthenticationPrincipal Jwt jwt) {
+        adminUserIdFromJwt(jwt);
         return imageUploadService.upload(file, courseFolderId, kind, lessonId, subLessonId);
     }
 
@@ -60,8 +72,8 @@ public class AdminUploadController {
             @RequestParam(value = "kind", defaultValue = "TRAILER") String kind,
             @RequestParam(value = "lessonId", required = false) Integer lessonId,
             @RequestParam(value = "subLessonId", required = false) Integer subLessonId,
-            @RequestAttribute(MockAuthFilter.AUTHENTICATED_USER_ID_ATTR) UUID adminUserId) {
-        Objects.requireNonNull(adminUserId, "authenticated admin");
+            @AuthenticationPrincipal Jwt jwt) {
+        adminUserIdFromJwt(jwt);
         return videoUploadService.upload(file, courseFolderId, kind, lessonId, subLessonId);
     }
 
@@ -70,8 +82,8 @@ public class AdminUploadController {
     public UploadUrlResponse uploadFile(
             @RequestPart("file") MultipartFile file,
             @RequestParam("courseFolderId") String courseFolderId,
-            @RequestAttribute(MockAuthFilter.AUTHENTICATED_USER_ID_ATTR) UUID adminUserId) {
-        Objects.requireNonNull(adminUserId, "authenticated admin");
+            @AuthenticationPrincipal Jwt jwt) {
+        adminUserIdFromJwt(jwt);
         return fileUploadService.uploadAttachment(file, courseFolderId);
     }
 }

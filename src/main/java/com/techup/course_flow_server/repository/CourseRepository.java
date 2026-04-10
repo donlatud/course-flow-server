@@ -8,12 +8,23 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 public interface CourseRepository extends JpaRepository<Course, UUID> {
 
     List<Course> findAllByOrderByCreatedAtDesc();
+
+    List<Course> findByCategory(String category);
+
+    List<Course> findByStatusOrderByCreatedAtDesc(Course.Status status);
+
+    default List<Course> findPublishedCourses() {
+        return findByStatusOrderByCreatedAtDesc(Course.Status.PUBLISHED);
+    }
+
+    @Query(
+            "SELECT m.course.id, COUNT(m) FROM CourseModule m "
+                    + "WHERE m.course.id IN :ids GROUP BY m.course.id")
+    List<Object[]> countModulesByCourseIds(@Param("ids") List<UUID> ids);
 
     Page<Course> findByTitleContainingIgnoreCase(String title, Pageable pageable);
 
