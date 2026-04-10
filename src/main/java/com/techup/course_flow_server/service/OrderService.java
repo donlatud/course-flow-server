@@ -140,6 +140,12 @@ public class OrderService {
         BigDecimal discount = promoCodeService.calculateDiscountAmount(promoCode, subtotal);
         BigDecimal total = subtotal.subtract(discount).max(BigDecimal.ZERO);
 
+        // Validate minimum payment amount (100 THB)
+        if (total.compareTo(PromoCodeService.MIN_PAYMENT_AMOUNT) < 0) {
+            throw new IllegalArgumentException("Total payment amount must be at least " 
+                    + PromoCodeService.MIN_PAYMENT_AMOUNT + " THB");
+        }
+
         Order order = Order.builder()
                 .user(user)
                 .promoCode(promoCode)
@@ -166,6 +172,12 @@ public class OrderService {
         PromoCode promoCode = promoCodeService.resolvePromoCodeForOrder(order.getUser().getId(), promoCodeInput, subtotal);
         BigDecimal discount = promoCodeService.calculateDiscountAmount(promoCode, subtotal);
         BigDecimal total = subtotal.subtract(discount).max(BigDecimal.ZERO);
+
+        // Validate minimum payment amount (100 THB)
+        if (total.compareTo(PromoCodeService.MIN_PAYMENT_AMOUNT) < 0) {
+            throw new IllegalArgumentException("Total payment amount must be at least " 
+                    + PromoCodeService.MIN_PAYMENT_AMOUNT + " THB");
+        }
 
         order.setPromoCode(promoCode);
         order.setTotalAmount(normalizeMoney(total));
