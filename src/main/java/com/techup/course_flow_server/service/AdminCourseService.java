@@ -26,6 +26,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -96,7 +101,7 @@ public class AdminCourseService {
                 .coverImageUrl(blankToNull(request.getCoverImageUrl()))
                 .trailerVideoUrl(blankToNull(request.getTrailerVideoUrl()))
                 .attachmentUrl(blankToNull(request.getAttachmentUrl()))
-                .status(Course.Status.DRAFT)
+                .status(request.getStatus() != null ? request.getStatus() : Course.Status.DRAFT)
                 .admin(admin)
                 .build();
         return courseRepository.save(course);
@@ -161,18 +166,50 @@ public class AdminCourseService {
     }
 
     // -------------------------------------------------------------------------
-    // GET /api/admin/courses — List all courses for the admin table
+    // GET /api/admin/courses — Paginated list for the admin course table
     // -------------------------------------------------------------------------
 
-    public List<CourseAdminSummaryResponse> listCourses() {
-        List<Course> courses = courseRepository.findAllByOrderByCreatedAtDesc();
+    public Page<CourseAdminSummaryResponse> listCourses(
+            int page, int size, String search, String sortBy, String sortDir) {
+        if (page < 0) {
+            page = 0;
+        }
+        if (size < 1) {
+            size = 10;
+        }
+        if (size > 100) {
+            size = 100;
+        }
+
+        String searchParam = search == null || search.isBlank() ? null : search.trim();
+        boolean asc = "asc".equalsIgnoreCase(sortDir);
+        String key = sortBy == null ? "createdAt" : sortBy.trim();
+        Page<Course> coursePage;
+
+        if ("lessonCount".equalsIgnoreCase(key)) {
+            Pageable unpagedSort = PageRequest.of(page, size);
+            coursePage =
+                    asc
+                            ? courseRepository.findAllOrderByLessonCountAsc(searchParam, unpagedSort)
+                            : courseRepository.findAllOrderByLessonCountDesc(searchParam, unpagedSort);
+        } else {
+            String property = mapCourseListSortProperty(key);
+            Sort.Direction direction = asc ? Sort.Direction.ASC : Sort.Direction.DESC;
+            Pageable pageable = PageRequest.of(page, size, Sort.by(direction, property));
+            if (searchParam == null) {
+                coursePage = courseRepository.findAll(pageable);
+            } else {
+                coursePage = courseRepository.findByTitleContainingIgnoreCase(searchParam, pageable);
+            }
+        }
+
+        List<Course> courses = coursePage.getContent();
         if (courses.isEmpty()) {
-            return List.of();
+            return new PageImpl<>(List.of(), coursePage.getPageable(), coursePage.getTotalElements());
         }
 
         List<UUID> courseIds = courses.stream().map(Course::getId).toList();
 
-        // Single query: returns [courseId, count] pairs
         Map<UUID, Long> lessonCountMap = courseModuleRepository.countByCourseIdIn(courseIds)
                 .stream()
                 .collect(Collectors.toMap(
@@ -180,7 +217,7 @@ public class AdminCourseService {
                         row -> (Long) row[1]
                 ));
 
-        return courses.stream()
+        List<CourseAdminSummaryResponse> content = courses.stream()
                 .map(c -> CourseAdminSummaryResponse.builder()
                         .id(c.getId())
                         .title(c.getTitle())
@@ -192,6 +229,23 @@ public class AdminCourseService {
                         .updatedAt(c.getUpdatedAt())
                         .build())
                 .toList();
+
+        return new PageImpl<>(content, coursePage.getPageable(), coursePage.getTotalElements());
+    }
+
+    /** Whitelist JPA property names for admin course list sorting. */
+    private static String mapCourseListSortProperty(String sortBy) {
+        if (sortBy == null || sortBy.isBlank()) {
+            return "createdAt";
+        }
+        return switch (sortBy.trim().toLowerCase()) {
+            case "title" -> "title";
+            case "status" -> "status";
+            case "price" -> "price";
+            case "createdat" -> "createdAt";
+            case "updatedat" -> "updatedAt";
+            default -> "createdAt";
+        };
     }
 
     // -------------------------------------------------------------------------
@@ -256,6 +310,9 @@ public class AdminCourseService {
         course.setCoverImageUrl(blankToNull(request.getCoverImageUrl()));
         course.setTrailerVideoUrl(blankToNull(request.getTrailerVideoUrl()));
         course.setAttachmentUrl(blankToNull(request.getAttachmentUrl()));
+        if (request.getStatus() != null) {
+            course.setStatus(request.getStatus());
+        }
         courseRepository.save(course);
 
         // Replace all modules + materials

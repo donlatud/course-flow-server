@@ -1,5 +1,6 @@
 package com.techup.course_flow_server.dto.admin.course;
 
+import com.techup.course_flow_server.entity.Course;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -43,6 +44,11 @@ public class UpdateCourseRequest {
 
     @Valid
     private CreatePromoCodeRequest promoCode;
+
+    /**
+     * When set, replaces the course status (e.g. DRAFT vs PUBLISHED). When omitted, existing status is kept.
+     */
+    private Course.Status status;
 
     @Valid
     private List<CreateModuleRequest> modules;

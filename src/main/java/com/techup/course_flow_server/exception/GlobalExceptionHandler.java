@@ -12,6 +12,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import com.techup.course_flow_server.upload.cloudinary.CloudinaryUploadException;
+import com.techup.course_flow_server.upload.supabase.SupabaseStorageException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -68,6 +70,35 @@ public class GlobalExceptionHandler {
             IllegalArgumentException exception,
             HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", exception.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalStateException(
+            IllegalStateException exception,
+            HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "INVALID_STATE", exception.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(SupabaseStorageException.class)
+    public ResponseEntity<ApiErrorResponse> handleSupabaseStorage(
+            SupabaseStorageException exception,
+            HttpServletRequest request) {
+        return build(
+                HttpStatus.BAD_GATEWAY,
+                "STORAGE_UPLOAD_FAILED",
+                exception.getMessage(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(CloudinaryUploadException.class)
+    public ResponseEntity<ApiErrorResponse> handleCloudinaryUpload(
+            CloudinaryUploadException exception,
+            HttpServletRequest request) {
+        return build(
+                HttpStatus.BAD_GATEWAY,
+                "VIDEO_UPLOAD_FAILED",
+                exception.getMessage(),
+                request.getRequestURI());
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
