@@ -42,7 +42,16 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/api/webhooks/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
+                // Public catalog only — do NOT use /api/courses/** (would expose /learning & /assignments without JWT
+                // and cause NPE on jwt.getSubject() → 500).
+                .requestMatchers(HttpMethod.GET,
+                        "/api/courses",
+                        "/api/courses/published",
+                        "/api/courses/search",
+                        "/api/courses/category/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/courses/*/modules-with-materials").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/courses/*/materials").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/courses/*").permitAll()
                 // Title uniqueness check for admin create form (read-only; create still requires ADMIN)
                 .requestMatchers(HttpMethod.GET, "/api/admin/courses/exists").permitAll()
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")

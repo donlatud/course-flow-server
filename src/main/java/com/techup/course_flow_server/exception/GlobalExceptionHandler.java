@@ -3,6 +3,8 @@ package com.techup.course_flow_server.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,8 @@ import com.techup.course_flow_server.upload.supabase.SupabaseStorageException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidationException(
@@ -128,12 +132,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleUnexpectedException(
             Exception exception,
             HttpServletRequest request) {
-        // Log the actual exception for debugging
-        System.err.println("=== UNEXPECTED EXCEPTION ===");
-        System.err.println("Path: " + request.getRequestURI());
-        exception.printStackTrace();
-        System.err.println("=== END EXCEPTION ===");
-        
+        log.error("Unhandled error on {}: {}", request.getRequestURI(), exception.toString(), exception);
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "INTERNAL_SERVER_ERROR",

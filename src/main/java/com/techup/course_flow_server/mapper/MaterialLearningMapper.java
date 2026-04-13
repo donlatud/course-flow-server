@@ -12,7 +12,10 @@ public interface MaterialLearningMapper {
     @Mapping(target = "materialId", source = "material.id")
     @Mapping(target = "title", source = "material.title")
     @Mapping(target = "orderIndex", source = "material.orderIndex")
-    @Mapping(target = "fileUrl", source = "material.fileUrl")
+    @Mapping(
+            target = "fileUrl",
+            expression =
+                    "java(com.techup.course_flow_server.util.VideoDeliveryUrlNormalizer.normalizeForVideoPlayer(material.getFileUrl(), material.getFileType()))")
     @Mapping(target = "fileType", source = "material.fileType")
     @Mapping(target = "duration", source = "material.duration")
     @Mapping(
