@@ -29,4 +29,42 @@ public final class UploadPathUtils {
         String ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase();
         return ext.isBlank() ? fallback : ext;
     }
+
+    /**
+     * Uses the client-provided filename for storage (no random rename). Strips any path segments,
+     * removes "..", and truncates very long names so the object key stays safe for Storage URLs.
+     */
+    public static String safeAttachmentFileName(MultipartFile file) {
+        String ext = fileExtension(file, "bin");
+        String raw = file.getOriginalFilename();
+        if (raw == null || raw.isBlank()) {
+            return "attachment." + ext;
+        }
+        String base = raw.trim();
+        int slash = Math.max(base.lastIndexOf('/'), base.lastIndexOf('\\'));
+        if (slash >= 0) {
+            base = base.substring(slash + 1).trim();
+        }
+        if (base.isEmpty()) {
+            return "attachment." + ext;
+        }
+        base = base.replace("..", "_");
+        // Storage / URL practicality
+        final int max = 200;
+        if (base.length() > max) {
+            if (base.contains(".")) {
+                String shortExt = base.substring(base.lastIndexOf('.') + 1);
+                String stem = base.substring(0, base.lastIndexOf('.'));
+                int budget = max - shortExt.length() - 1;
+                if (budget > 8) {
+                    base = stem.substring(0, Math.min(stem.length(), budget)) + "." + shortExt;
+                } else {
+                    base = "attachment." + ext;
+                }
+            } else {
+                base = base.substring(0, max);
+            }
+        }
+        return base;
+    }
 }

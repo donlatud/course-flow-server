@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 import com.techup.course_flow_server.upload.cloudinary.CloudinaryUploadException;
 import com.techup.course_flow_server.upload.supabase.SupabaseStorageException;
@@ -98,6 +99,17 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_GATEWAY,
                 "VIDEO_UPLOAD_FAILED",
                 exception.getMessage(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleMaxUploadSize(
+            MaxUploadSizeExceededException exception,
+            HttpServletRequest request) {
+        return build(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "FILE_TOO_LARGE",
+                "Uploaded file exceeds the maximum allowed size",
                 request.getRequestURI());
     }
 

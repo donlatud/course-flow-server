@@ -1,7 +1,10 @@
 package com.techup.course_flow_server.upload.cloudinary;
 
 import com.techup.course_flow_server.config.CloudinaryProperties;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -10,7 +13,7 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -19,6 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Server-side video upload to Cloudinary (signed upload, same folders as the SPA).
@@ -40,9 +44,11 @@ public class CloudinaryClient {
     }
 
     /**
-     * Upload raw video bytes; returns {@code secure_url} from the JSON response.
+     * Upload video from multipart (streamed via a temp file — avoids loading large files entirely into heap).
+     *
+     * @return {@code secure_url} from the JSON response
      */
-    public String uploadVideo(byte[] data, String folder, String filename, String contentType) {
+    public String uploadVideo(MultipartFile multipartFile, String folder, String filename, String contentType) {
         requireConfig();
 
         String cloud = props.cloudName().trim();
@@ -57,26 +63,33 @@ public class CloudinaryClient {
 
         String url = "https://api.cloudinary.com/v1_1/" + cloud + "/video/upload";
 
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add(
-                "file",
-                new ByteArrayResource(data) {
-                    @Override
-                    public String getFilename() {
-                        return filename != null && !filename.isBlank() ? filename : "video.mp4";
-                    }
-                });
-        body.add("api_key", apiKey);
-        body.add("timestamp", Long.toString(timestamp));
-        body.add("signature", signature);
-        body.add("folder", folder.trim());
+        final String uploadFilename =
+                filename != null && !filename.isBlank() ? filename : "video.mp4";
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-        HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
-
+        Path tempFile = null;
         try {
+            tempFile = Files.createTempFile("cloudinary-video-", "-" + uploadFilename);
+            multipartFile.transferTo(tempFile.toFile());
+
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add(
+                    "file",
+                    new FileSystemResource(tempFile.toFile()) {
+                        @Override
+                        public String getFilename() {
+                            return uploadFilename;
+                        }
+                    });
+            body.add("api_key", apiKey);
+            body.add("timestamp", Long.toString(timestamp));
+            body.add("signature", signature);
+            body.add("folder", folder.trim());
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+            HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
+
             ResponseEntity<String> response =
                     restTemplate.postForEntity(url, request, String.class);
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
@@ -96,8 +109,18 @@ public class CloudinaryClient {
             return secureUrlMatcher.group(1);
         } catch (CloudinaryUploadException ex) {
             throw ex;
+        } catch (IOException ex) {
+            throw new CloudinaryUploadException("Failed to stage video for Cloudinary upload", ex);
         } catch (Exception ex) {
             throw new CloudinaryUploadException("Cloudinary upload failed: " + ex.getMessage(), ex);
+        } finally {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException ignored) {
+                    // best-effort cleanup
+                }
+            }
         }
     }
 

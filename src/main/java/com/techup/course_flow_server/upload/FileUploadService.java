@@ -4,7 +4,6 @@ import com.techup.course_flow_server.config.SupabaseProperties;
 import com.techup.course_flow_server.dto.upload.UploadUrlResponse;
 import com.techup.course_flow_server.upload.supabase.SupabaseStorageClient;
 import java.io.IOException;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,12 +18,13 @@ public class FileUploadService {
         this.supabaseProperties = supabaseProperties;
     }
 
-    /** Course attachment → {@code course_file} bucket, {@code {id}/file/{uuid}.ext}. */
+    /** Course attachment → {@code course_file} bucket, {@code {id}/file/{original file name}}. */
     public UploadUrlResponse uploadAttachment(MultipartFile file, String courseFolderId) {
         UploadValidators.validateAttachment(file);
         String bucket = fileBucket();
-        String ext = UploadPathUtils.fileExtension(file, "bin");
-        String objectPath = UploadPathUtils.buildPath(courseFolderId, "file", UUID.randomUUID() + "." + ext);
+        String objectPath =
+                UploadPathUtils.buildPath(
+                        courseFolderId, "file", UploadPathUtils.safeAttachmentFileName(file));
         String ct = file.getContentType();
         if (ct == null || ct.isBlank()) {
             ct = "application/octet-stream";
