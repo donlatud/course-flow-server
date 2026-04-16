@@ -23,6 +23,8 @@ public class AdminAssignmentResponse {
     private String materialTitle;
     private String title;
     private String description;
+    /** Admin-only: model answer / solution text. */
+    private String solution;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private LocalDateTime createdAt;

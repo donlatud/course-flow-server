@@ -68,6 +68,7 @@ public class AssignmentService {
                             .assignmentId(assignment.getId())
                             .title(assignment.getTitle())
                             .description(assignment.getDescription())
+                            .solution(submitted ? assignment.getSolution() : null)
                             .startDate(assignment.getStartDate())
                             .endDate(assignment.getEndDate())
                             .submitted(submitted)
@@ -118,6 +119,7 @@ public class AssignmentService {
                 .submissionText(saved.getSubmissionText())
                 .fileUrl(saved.getFileUrl())
                 .submittedAt(saved.getSubmittedAt())
+                .solution(assignment.getSolution())
                 .build();
     }
 }

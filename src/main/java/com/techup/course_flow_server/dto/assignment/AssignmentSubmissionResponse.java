@@ -22,4 +22,9 @@ public class AssignmentSubmissionResponse {
     private String submissionText;
     private String fileUrl;
     private LocalDateTime submittedAt;
+    /**
+     * Model answer / solution text for the assignment.
+     * Returned after successful submission.
+     */
+    private String solution;
 }

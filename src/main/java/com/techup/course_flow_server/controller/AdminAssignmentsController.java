@@ -213,6 +213,7 @@ public class AdminAssignmentsController {
                 .material(material)
                 .title(request.getTitle())
                 .description(request.getDescription())
+                .solution(request.getSolution())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .createdAt(java.time.LocalDateTime.now())
@@ -257,6 +258,7 @@ public class AdminAssignmentsController {
         // Update other fields
         assignment.setTitle(request.getTitle());
         assignment.setDescription(request.getDescription());
+        assignment.setSolution(request.getSolution());
         assignment.setStartDate(request.getStartDate());
         assignment.setEndDate(request.getEndDate());
 
@@ -286,6 +288,7 @@ public class AdminAssignmentsController {
                 .materialTitle(assignment.getMaterial() != null ? assignment.getMaterial().getTitle() : null)
                 .title(assignment.getTitle())
                 .description(assignment.getDescription())
+                .solution(assignment.getSolution())
                 .startDate(assignment.getStartDate())
                 .endDate(assignment.getEndDate())
                 .createdAt(assignment.getCreatedAt())

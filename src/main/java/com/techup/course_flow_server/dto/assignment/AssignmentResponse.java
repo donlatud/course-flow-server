@@ -18,6 +18,11 @@ public class AssignmentResponse {
     private UUID assignmentId;
     private String title;
     private String description;
+    /**
+     * Model answer / solution text.
+     * Returned only after the learner has submitted (server enforces).
+     */
+    private String solution;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Boolean submitted;

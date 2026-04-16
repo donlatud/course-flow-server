@@ -48,6 +48,9 @@ public class Assignment {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(columnDefinition = "TEXT")
+    private String solution;
+
     @Column(name = "start_date")
     private LocalDateTime startDate;
 
