@@ -5,10 +5,15 @@ import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -128,10 +133,65 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
+    /** Often Jackson failing to write the controller return value (e.g. response DTO misconfiguration). */
+    @ExceptionHandler(HttpMessageNotWritableException.class)
+    public ResponseEntity<ApiErrorResponse> handleMessageNotWritable(
+            HttpMessageNotWritableException exception,
+            HttpServletRequest request) {
+        log.error("Response serialization failed on {}", request.getRequestURI(), exception);
+        String msg = exception.getMessage();
+        if (msg == null || msg.isBlank()) {
+            msg = "Failed to serialize response body";
+        } else if (msg.length() > 400) {
+            msg = msg.substring(0, 397) + "...";
+        }
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "SERIALIZATION_ERROR", msg, request.getRequestURI());
+    }
+
+    /** Multipart parse / binding issues (missing part, corrupt boundary, etc.). */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiErrorResponse> handleMultipart(
+            MultipartException exception,
+            HttpServletRequest request) {
+        String msg = exception.getMessage();
+        if (msg == null || msg.isBlank()) {
+            msg = "Multipart request could not be processed";
+        }
+        return build(HttpStatus.BAD_REQUEST, "MULTIPART_ERROR", msg, request.getRequestURI());
+    }
+
+    /**
+     * RestClient default error path when no custom {@code onStatus} applies (should be rare for Storage
+     * client; kept so clients get 502 + message instead of generic 500).
+     */
+    @ExceptionHandler(RestClientResponseException.class)
+    public ResponseEntity<ApiErrorResponse> handleRestClientResponse(
+            RestClientResponseException exception,
+            HttpServletRequest request) {
+        log.warn(
+                "Upstream HTTP {} on {}",
+                exception.getStatusCode(),
+                request.getRequestURI(),
+                exception);
+        String msg = exception.getMessage();
+        if (msg == null || msg.isBlank()) {
+            msg =
+                    "Upstream request failed: "
+                            + exception.getStatusCode()
+                            + " "
+                            + exception.getStatusText();
+        }
+        if (msg.length() > 600) {
+            msg = msg.substring(0, 597) + "...";
+        }
+        return build(HttpStatus.BAD_GATEWAY, "UPSTREAM_HTTP_ERROR", msg, request.getRequestURI());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpectedException(
             Exception exception,
             HttpServletRequest request) {
+        log.error("Unhandled exception on {}", request.getRequestURI(), exception);
         log.error("Unhandled error on {}: {}", request.getRequestURI(), exception.toString(), exception);
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR,

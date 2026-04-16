@@ -46,6 +46,6 @@ public class VideoUploadService {
             ct = "video/mp4";
         }
         String url = cloudinaryClient.uploadVideo(file, folder, filename, ct);
-        return UploadUrlResponse.builder().url(url).provider("CLOUDINARY").build();
+        return new UploadUrlResponse(url, "CLOUDINARY");
     }
 }

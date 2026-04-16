@@ -54,7 +54,7 @@ public class ImageUploadService {
                             objectPath,
                             file.getBytes(),
                             file.getContentType() != null ? file.getContentType() : "image/jpeg");
-            return UploadUrlResponse.builder().url(url).provider("SUPABASE").build();
+            return new UploadUrlResponse(url, "SUPABASE");
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read uploaded file", e);
         }
