@@ -17,6 +17,15 @@ import org.springframework.stereotype.Service;
 @Service
 public class PromoCodeService {
 
+    /** Minimum course price required to use promo codes (in THB) */
+    public static final BigDecimal MIN_COURSE_PRICE_FOR_PROMO = new BigDecimal("200.00");
+
+    /** Minimum final price after discount (in THB) */
+    public static final BigDecimal MIN_FINAL_PRICE = new BigDecimal("100.00");
+
+    /** Minimum payment amount (in THB) - used by OrderService/PaymentService */
+    public static final BigDecimal MIN_PAYMENT_AMOUNT = new BigDecimal("100.00");
+
     private final PromoCodeRepository promoCodeRepository;
     private final PromoRedemptionRepository promoRedemptionRepository;
 
@@ -30,11 +39,20 @@ public class PromoCodeService {
     /**
      * Validates a promo code for the current user and returns a UI-friendly
      * response containing the computed discount values.
+     *
+     * Business rules:
+     * - Course price must be greater than 200 THB to use promo codes
+     * - Final price after discount must be at least 100 THB
      */
     public PromoCodeValidationResponse validatePromoCode(UUID userId, String code, BigDecimal originalPrice) {
         String normalizedCode = normalizeCode(code);
         if (normalizedCode == null || originalPrice == null || originalPrice.signum() < 0) {
             return invalidResponse(normalizedCode, PromoCodeValidationResponse.Reason.INVALID);
+        }
+
+        // Check minimum course price for promo eligibility (must be > 200 THB)
+        if (originalPrice.compareTo(MIN_COURSE_PRICE_FOR_PROMO) <= 0) {
+            return invalidResponse(normalizedCode, PromoCodeValidationResponse.Reason.COURSE_PRICE_TOO_LOW);
         }
 
         PromoCode promoCode = promoCodeRepository.findByCodeIgnoreCase(normalizedCode)
@@ -51,6 +69,11 @@ public class PromoCodeService {
 
         BigDecimal discountAmount = calculateDiscountAmount(promoCode, originalPrice);
         BigDecimal finalPrice = originalPrice.subtract(discountAmount).max(BigDecimal.ZERO);
+
+        // Check minimum final price after discount (must be >= 100 THB)
+        if (finalPrice.compareTo(MIN_FINAL_PRICE) < 0) {
+            return invalidResponse(normalizedCode, PromoCodeValidationResponse.Reason.FINAL_PRICE_TOO_LOW);
+        }
 
         return PromoCodeValidationResponse.builder()
                 .valid(true)
