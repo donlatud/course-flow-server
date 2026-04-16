@@ -13,6 +13,8 @@ public interface CourseModuleRepository extends JpaRepository<CourseModule, UUID
 
     List<CourseModule> findAllByCourseIdOrderByOrderIndexAsc(UUID courseId);
 
+    long countByCourseId(UUID courseId);
+
     /**
      * Returns pairs of [courseId, lessonCount] for the given course IDs.
      * Used to build the admin course list without N+1 queries.

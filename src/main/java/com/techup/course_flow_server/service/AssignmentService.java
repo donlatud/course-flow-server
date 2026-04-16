@@ -47,7 +47,7 @@ public class AssignmentService {
             throw new IllegalArgumentException("Enrollment is inactive for this user and course");
         }
 
-        List<Assignment> assignments = assignmentRepository.findAllByCourseIdOrderByStartDateAsc(courseId);
+        List<Assignment> assignments = assignmentRepository.findAllByCourseIdOrderByModuleOrderIndexAsc(courseId);
         List<UUID> assignmentIds = assignments.stream().map(Assignment::getId).toList();
 
         Map<UUID, AssignmentSubmission> submissionByAssignmentId = assignmentIds.isEmpty()
@@ -68,6 +68,10 @@ public class AssignmentService {
                             .assignmentId(assignment.getId())
                             .title(assignment.getTitle())
                             .description(assignment.getDescription())
+                            .moduleId(assignment.getModule() != null ? assignment.getModule().getId() : null)
+                            .moduleName(assignment.getModule() != null ? assignment.getModule().getTitle() : null)
+                            .courseId(assignment.getCourse() != null ? assignment.getCourse().getId() : null)
+                            .courseTitle(assignment.getCourse() != null ? assignment.getCourse().getTitle() : null)
                             .solution(submitted ? assignment.getSolution() : null)
                             .startDate(assignment.getStartDate())
                             .endDate(assignment.getEndDate())
@@ -75,6 +79,7 @@ public class AssignmentService {
                             .submissionId(submission != null ? submission.getId() : null)
                             .submissionStatus(submission != null ? submission.getStatus() : null)
                             .submittedAt(submission != null ? submission.getSubmittedAt() : null)
+                            .submittedAnswer(submission != null ? submission.getSubmissionText() : null)
                             .build();
                 })
                 .toList();

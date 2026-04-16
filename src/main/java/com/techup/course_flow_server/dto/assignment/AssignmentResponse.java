@@ -18,6 +18,10 @@ public class AssignmentResponse {
     private UUID assignmentId;
     private String title;
     private String description;
+    private UUID moduleId;
+    private String moduleName;
+    private UUID courseId;
+    private String courseTitle;
     /**
      * Model answer / solution text.
      * Returned only after the learner has submitted (server enforces).
@@ -29,4 +33,6 @@ public class AssignmentResponse {
     private UUID submissionId;
     private AssignmentSubmission.Status submissionStatus;
     private LocalDateTime submittedAt;
+    /** Learner's submitted answer text (null if none). */
+    private String submittedAnswer;
 }
