@@ -4,8 +4,6 @@ import com.techup.course_flow_server.dto.upload.UploadUrlResponse;
 import com.techup.course_flow_server.upload.FileUploadService;
 import com.techup.course_flow_server.upload.ImageUploadService;
 import com.techup.course_flow_server.upload.VideoUploadService;
-import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -55,9 +53,7 @@ public class AdminUploadController {
             @RequestParam("courseFolderId") String courseFolderId,
             @RequestParam(value = "kind", defaultValue = "COVER") String kind,
             @RequestParam(value = "lessonId", required = false) Integer lessonId,
-            @RequestParam(value = "subLessonId", required = false) Integer subLessonId,
-            @AuthenticationPrincipal Jwt jwt) {
-        adminUserIdFromJwt(jwt);
+            @RequestParam(value = "subLessonId", required = false) Integer subLessonId) {
         return imageUploadService.upload(file, courseFolderId, kind, lessonId, subLessonId);
     }
 
@@ -71,19 +67,14 @@ public class AdminUploadController {
             @RequestParam("courseFolderId") String courseFolderId,
             @RequestParam(value = "kind", defaultValue = "TRAILER") String kind,
             @RequestParam(value = "lessonId", required = false) Integer lessonId,
-            @RequestParam(value = "subLessonId", required = false) Integer subLessonId,
-            @AuthenticationPrincipal Jwt jwt) {
-        adminUserIdFromJwt(jwt);
+            @RequestParam(value = "subLessonId", required = false) Integer subLessonId) {
         return videoUploadService.upload(file, courseFolderId, kind, lessonId, subLessonId);
     }
 
     /** Multipart: {@code file}, {@code courseFolderId}. */
     @PostMapping(value = "/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public UploadUrlResponse uploadFile(
-            @RequestPart("file") MultipartFile file,
-            @RequestParam("courseFolderId") String courseFolderId,
-            @AuthenticationPrincipal Jwt jwt) {
-        adminUserIdFromJwt(jwt);
+            @RequestPart("file") MultipartFile file, @RequestParam("courseFolderId") String courseFolderId) {
         return fileUploadService.uploadAttachment(file, courseFolderId);
     }
 }

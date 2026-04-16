@@ -16,9 +16,13 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private final SupabaseProperties supabaseProperties;
+    private final JwtUserRoleAuthenticationConverter jwtUserRoleAuthenticationConverter;
 
-    public SecurityConfig(SupabaseProperties supabaseProperties) {
+    public SecurityConfig(
+            SupabaseProperties supabaseProperties,
+            JwtUserRoleAuthenticationConverter jwtUserRoleAuthenticationConverter) {
         this.supabaseProperties = supabaseProperties;
+        this.jwtUserRoleAuthenticationConverter = jwtUserRoleAuthenticationConverter;
     }
 
     @Bean
@@ -39,8 +43,13 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/api/webhooks/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
+                // Title uniqueness check for admin create form (read-only; create still requires ADMIN)
+                .requestMatchers(HttpMethod.GET, "/api/admin/courses/exists").permitAll()
+                .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                 .anyRequest().authenticated())
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder())));
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
+                .decoder(jwtDecoder())
+                .jwtAuthenticationConverter(jwtUserRoleAuthenticationConverter)));
         return http.build();
     }
 }

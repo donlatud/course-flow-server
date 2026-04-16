@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriUtils;
 
 /**
@@ -51,26 +52,33 @@ public class SupabaseStorageClient {
                         ? contentType
                         : MediaType.APPLICATION_OCTET_STREAM_VALUE;
 
-        restClient
-                .post()
-                .uri(url)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + key)
-                .header("apikey", key)
-                .header(HttpHeaders.CONTENT_TYPE, ct)
-                .body(data)
-                .retrieve()
-                .onStatus(
-                        status -> status.is4xxClientError() || status.is5xxServerError(),
-                        (req, res) -> {
-                            throw new SupabaseStorageException(
-                                    "Supabase upload failed: "
-                                            + res.getStatusCode()
-                                            + " "
-                                            + res.getStatusText()
-                                            + " — "
-                                            + new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8));
-                        })
-                .toBodilessEntity();
+        try {
+            restClient
+                    .post()
+                    .uri(url)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + key)
+                    .header("apikey", key)
+                    .header(HttpHeaders.CONTENT_TYPE, ct)
+                    .body(data)
+                    .retrieve()
+                    .onStatus(
+                            status -> status.is4xxClientError() || status.is5xxServerError(),
+                            (req, res) -> {
+                                throw new SupabaseStorageException(
+                                        "Supabase upload failed: "
+                                                + res.getStatusCode()
+                                                + " "
+                                                + res.getStatusText()
+                                                + " — "
+                                                + new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                            })
+                    .toBodilessEntity();
+        } catch (SupabaseStorageException e) {
+            throw e;
+        } catch (RestClientException e) {
+            throw new SupabaseStorageException(
+                    "Supabase upload failed (network or client error): " + e.getMessage(), e);
+        }
 
         return getPublicUrl(bucket, objectPath);
     }

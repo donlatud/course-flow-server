@@ -77,8 +77,12 @@ public class AuthService {
         }
 
         String accessToken = (String) supabaseResponse.get("access_token");
-        if (accessToken == null) {
+        if (accessToken == null || accessToken.isBlank()) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to retrieve access token");
+        }
+        String refreshToken = (String) supabaseResponse.get("refresh_token");
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to retrieve refresh token");
         }
 
         // 2. Extract user UUID from JWT sub claim (no network call needed)
@@ -97,7 +101,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
         }
 
-        return new AdminLoginResponse(accessToken, userId.toString(), user.getRole().name());
+        return new AdminLoginResponse(accessToken, refreshToken, userId.toString(), user.getRole().name());
     }
 
     public AuthResponse register(RegisterRequest request) {

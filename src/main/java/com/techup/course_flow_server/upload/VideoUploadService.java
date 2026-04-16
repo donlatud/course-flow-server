@@ -2,7 +2,6 @@ package com.techup.course_flow_server.upload;
 
 import com.techup.course_flow_server.dto.upload.UploadUrlResponse;
 import com.techup.course_flow_server.upload.cloudinary.CloudinaryClient;
-import java.io.IOException;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -42,17 +41,11 @@ public class VideoUploadService {
         String ext = UploadPathUtils.fileExtension(file, "mp4");
         String filename = "video-" + UUID.randomUUID() + "." + ext;
 
-        try {
-            String ct = file.getContentType();
-            if (ct == null || ct.isBlank()) {
-                ct = "video/mp4";
-            }
-            String url =
-                    cloudinaryClient.uploadVideo(
-                            file.getBytes(), folder, filename, ct);
-            return UploadUrlResponse.builder().url(url).provider("CLOUDINARY").build();
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to read uploaded file", e);
+        String ct = file.getContentType();
+        if (ct == null || ct.isBlank()) {
+            ct = "video/mp4";
         }
+        String url = cloudinaryClient.uploadVideo(file, folder, filename, ct);
+        return UploadUrlResponse.builder().url(url).provider("CLOUDINARY").build();
     }
 }

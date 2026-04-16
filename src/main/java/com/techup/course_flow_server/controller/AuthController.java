@@ -6,6 +6,7 @@ import com.techup.course_flow_server.dto.auth.LoginRequest;
 import com.techup.course_flow_server.dto.auth.RegisterRequest;
 import com.techup.course_flow_server.service.AuthService;
 import jakarta.validation.Valid;
+import java.util.Map;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,9 +27,18 @@ public class AuthController {
         return authService.login(request);
     }
 
+    /**
+     * Explicit JSON keys ({@code access_token}, {@code refresh_token}) so clients never depend on
+     * Jackson record naming.
+     */
     @PostMapping("/admin-login")
-    public AdminLoginResponse adminLogin(@Valid @RequestBody LoginRequest request) {
-        return authService.adminLogin(request);
+    public Map<String, String> adminLogin(@Valid @RequestBody LoginRequest request) {
+        AdminLoginResponse r = authService.adminLogin(request);
+        return Map.of(
+                "access_token", r.accessToken(),
+                "refresh_token", r.refreshToken(),
+                "user_id", r.userId(),
+                "role", r.role());
     }
 
     @PostMapping("/register")
