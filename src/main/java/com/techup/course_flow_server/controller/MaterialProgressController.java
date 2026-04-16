@@ -49,8 +49,9 @@ public class MaterialProgressController {
             @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
 
+        // Was (1, 10) → only one PUT per 10s per user, which breaks periodic saves + completion (429).
         String rateLimitKey = rateLimitService.buildMaterialProgressUpdateKey(userId);
-        if (!rateLimitService.isAllowed(rateLimitKey, 1, 10)) {
+        if (!rateLimitService.isAllowed(rateLimitKey, 120, 60)) {
             throw new ResponseStatusException(
                     HttpStatus.TOO_MANY_REQUESTS,
                     "Too many progress update requests. Please wait before retrying.");

@@ -13,21 +13,42 @@ public class CorsConfig {
      * Comma-separated list of allowed origins, e.g.
      * "http://localhost:5173,https://admin.example.com".
      *
-     * For local development we default to Vite dev server.
+     * If you need flexible dev ports, prefer allowed origin patterns
+     * (e.g. "http://localhost:*,http://127.0.0.1:*") which works with Vite's
+     * auto port switching while still being explicit.
+     *
+     * For local development we default to Vite dev server ports.
      */
-    @Value("${cors.allowed-origins:http://localhost:5173}")
+    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:5174}")
     private String allowedOrigins;
+
+    /**
+     * Comma-separated allowed origin patterns (supports wildcards),
+     * e.g. "http://localhost:*,http://127.0.0.1:*".
+     *
+     * Default enables local dev regardless of Vite port.
+     */
+    @Value("${cors.allowed-origin-patterns:http://localhost:*,http://127.0.0.1:*}")
+    private String allowedOriginPatterns;
 
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/api/**")
-                        .allowedOrigins(splitOrigins(allowedOrigins))
+                String[] patterns = splitOrigins(allowedOriginPatterns);
+                String[] origins = splitOrigins(allowedOrigins);
+
+                var reg = registry.addMapping("/api/**")
                         .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
+
+                if (patterns.length > 0) {
+                    reg.allowedOriginPatterns(patterns);
+                } else {
+                    reg.allowedOrigins(origins);
+                }
             }
         };
     }

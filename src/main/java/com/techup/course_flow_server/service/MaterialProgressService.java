@@ -39,6 +39,7 @@ public class MaterialProgressService {
     private final ModuleProgressRepository moduleProgressRepository;
     private final CourseModuleRepository courseModuleRepository;
     private final MaterialProgressMapper materialProgressMapper;
+    private final EnrollmentProgressCalculator enrollmentProgressCalculator;
 
     public MaterialProgressService(
             EnrollmentRepository enrollmentRepository,
@@ -46,13 +47,15 @@ public class MaterialProgressService {
             MaterialProgressRepository materialProgressRepository,
             ModuleProgressRepository moduleProgressRepository,
             CourseModuleRepository courseModuleRepository,
-            MaterialProgressMapper materialProgressMapper) {
+            MaterialProgressMapper materialProgressMapper,
+            EnrollmentProgressCalculator enrollmentProgressCalculator) {
         this.enrollmentRepository = enrollmentRepository;
         this.materialRepository = materialRepository;
         this.materialProgressRepository = materialProgressRepository;
         this.moduleProgressRepository = moduleProgressRepository;
         this.courseModuleRepository = courseModuleRepository;
         this.materialProgressMapper = materialProgressMapper;
+        this.enrollmentProgressCalculator = enrollmentProgressCalculator;
     }
 
     @Transactional
@@ -246,7 +249,10 @@ public class MaterialProgressService {
         Map<UUID, MaterialProgress> progressByMaterialId = materialProgressRepository
                 .findAllByEnrollmentId(enrollment.getId())
                 .stream()
-                .collect(Collectors.toMap(mp -> mp.getMaterial().getId(), Function.identity()));
+                .collect(Collectors.toMap(
+                        mp -> mp.getMaterial().getId(),
+                        Function.identity(),
+                        (a, b) -> a));
 
         return moduleMaterials.stream()
                 .allMatch(material -> {
@@ -262,40 +268,10 @@ public class MaterialProgressService {
     }
 
     private BigDecimal recalculateEnrollmentProgress(Enrollment enrollment) {
-        List<CourseModule> courseModules = courseModuleRepository.findAllByCourseIdOrderByOrderIndexAsc(
-                enrollment.getCourse().getId());
-        List<UUID> moduleIds = courseModules.stream().map(CourseModule::getId).toList();
-
-        List<Material> materials = moduleIds.isEmpty()
-                ? List.of()
-                : materialRepository.findAllByModuleIdInOrderByModuleOrderIndexAscOrderIndexAsc(moduleIds);
-        int totalMaterials = materials.size();
-
-        Map<UUID, MaterialProgress> progressByMaterialId = materialProgressRepository
-                .findAllByEnrollmentId(enrollment.getId())
-                .stream()
-                .collect(Collectors.toMap(mp -> mp.getMaterial().getId(), Function.identity()));
-
-        int completedMaterials = (int) materials.stream()
-                .filter(material -> {
-                    MaterialProgress progress = progressByMaterialId.get(material.getId());
-                    return progress != null && progress.getStatus() == MaterialProgress.Status.COMPLETED;
-                })
-                .count();
-
-        BigDecimal progressPercentage = toPercentage(completedMaterials, totalMaterials);
+        BigDecimal progressPercentage = enrollmentProgressCalculator.computeProgressPercentage(enrollment);
         enrollment.setProgressPercentage(progressPercentage);
         enrollmentRepository.save(enrollment);
         return progressPercentage;
-    }
-
-    private BigDecimal toPercentage(int numerator, int denominator) {
-        if (denominator == 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-        return BigDecimal.valueOf(numerator)
-                .multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(denominator), 2, RoundingMode.HALF_UP);
     }
 
     private MaterialProgressResponse toResponse(

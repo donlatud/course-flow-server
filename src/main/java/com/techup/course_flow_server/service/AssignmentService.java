@@ -10,6 +10,7 @@ import com.techup.course_flow_server.repository.AssignmentRepository;
 import com.techup.course_flow_server.repository.AssignmentSubmissionRepository;
 import com.techup.course_flow_server.repository.EnrollmentRepository;
 import jakarta.transaction.Transactional;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -24,21 +25,27 @@ public class AssignmentService {
     private final AssignmentRepository assignmentRepository;
     private final AssignmentSubmissionRepository assignmentSubmissionRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final EnrollmentProgressCalculator enrollmentProgressCalculator;
 
     public AssignmentService(
             AssignmentRepository assignmentRepository,
             AssignmentSubmissionRepository assignmentSubmissionRepository,
-            EnrollmentRepository enrollmentRepository) {
+            EnrollmentRepository enrollmentRepository,
+            EnrollmentProgressCalculator enrollmentProgressCalculator) {
         this.assignmentRepository = assignmentRepository;
         this.assignmentSubmissionRepository = assignmentSubmissionRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.enrollmentProgressCalculator = enrollmentProgressCalculator;
     }
 
     @Transactional
     public List<AssignmentResponse> getAssignments(UUID courseId, UUID userId) {
         // Ensure caller is enrolled in this course before exposing assignments.
-        enrollmentRepository.findByUserIdAndCourseId(userId, courseId)
+        Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseId(userId, courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Enrollment not found for this user and course"));
+        if (enrollment.getStatus() == Enrollment.Status.UNSUBSCRIBED) {
+            throw new IllegalArgumentException("Enrollment is inactive for this user and course");
+        }
 
         List<Assignment> assignments = assignmentRepository.findAllByCourseIdOrderByStartDateAsc(courseId);
         List<UUID> assignmentIds = assignments.stream().map(Assignment::getId).toList();
@@ -46,16 +53,22 @@ public class AssignmentService {
         Map<UUID, AssignmentSubmission> submissionByAssignmentId = assignmentIds.isEmpty()
                 ? Map.of()
                 : assignmentSubmissionRepository.findAllByAssignmentIdInAndUserId(assignmentIds, userId).stream()
-                        .collect(Collectors.toMap(submission -> submission.getAssignment().getId(), Function.identity()));
+                        .collect(Collectors.toMap(
+                                submission -> submission.getAssignment().getId(),
+                                Function.identity(),
+                                (a, b) -> a));
 
         return assignments.stream()
                 .map(assignment -> {
                     AssignmentSubmission submission = submissionByAssignmentId.get(assignment.getId());
-                    boolean submitted = submission != null && submission.getStatus() == AssignmentSubmission.Status.SUBMITTED;
+                    boolean submitted = submission != null
+                            && (submission.getStatus() == AssignmentSubmission.Status.SUBMITTED
+                                    || submission.getStatus() == AssignmentSubmission.Status.GRADED);
                     return AssignmentResponse.builder()
                             .assignmentId(assignment.getId())
                             .title(assignment.getTitle())
                             .description(assignment.getDescription())
+                            .solution(submitted ? assignment.getSolution() : null)
                             .startDate(assignment.getStartDate())
                             .endDate(assignment.getEndDate())
                             .submitted(submitted)
@@ -93,6 +106,11 @@ public class AssignmentService {
         submission.setSubmittedAt(LocalDateTime.now());
 
         AssignmentSubmission saved = assignmentSubmissionRepository.save(submission);
+
+        BigDecimal progressPercentage = enrollmentProgressCalculator.computeProgressPercentage(enrollment);
+        enrollment.setProgressPercentage(progressPercentage);
+        enrollmentRepository.save(enrollment);
+
         return AssignmentSubmissionResponse.builder()
                 .submissionId(saved.getId())
                 .assignmentId(saved.getAssignment().getId())
@@ -101,6 +119,7 @@ public class AssignmentService {
                 .submissionText(saved.getSubmissionText())
                 .fileUrl(saved.getFileUrl())
                 .submittedAt(saved.getSubmittedAt())
+                .solution(assignment.getSolution())
                 .build();
     }
 }
