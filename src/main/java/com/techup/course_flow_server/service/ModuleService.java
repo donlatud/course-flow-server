@@ -1,7 +1,9 @@
 package com.techup.course_flow_server.service;
 
 import com.techup.course_flow_server.dto.module.MaterialSummaryResponse;
+import com.techup.course_flow_server.dto.module.ModuleResponse;
 import com.techup.course_flow_server.dto.module.ModuleWithMaterialsResponse;
+import com.techup.course_flow_server.dto.module.UpdateModuleRequest;
 import com.techup.course_flow_server.entity.Course;
 import com.techup.course_flow_server.entity.CourseModule;
 import com.techup.course_flow_server.entity.Material;
@@ -13,6 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ModuleService {
@@ -91,6 +94,76 @@ public class ModuleService {
                 .detail(material.getDetail())
                 .fileType(material.getFileType())
                 .duration(material.getDuration())
+                .build();
+    }
+
+    /**
+     * Get all modules for a specific course.
+     * Returns basic module info without materials.
+     */
+    public List<ModuleResponse> getModulesByCourseId(UUID courseId) {
+        List<CourseModule> modules = courseModuleRepository.findAllByCourseIdOrderByOrderIndexAsc(courseId);
+        return modules.stream()
+                .map(this::convertToModuleResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all modules across all courses.
+     * Returns basic module info without materials.
+     */
+    public List<ModuleResponse> getAllModules() {
+        List<CourseModule> modules = courseModuleRepository.findAll();
+        return modules.stream()
+                .map(this::convertToModuleResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get a single module by its ID.
+     * Returns basic module info without materials.
+     */
+    public ModuleResponse getModuleById(UUID moduleId) {
+        CourseModule module = courseModuleRepository.findById(moduleId)
+                .orElseThrow(() -> new RuntimeException("Module not found with id: " + moduleId));
+        
+        return convertToModuleResponse(module);
+    }
+
+    /**
+     * Update a module by its ID.
+     */
+    @Transactional
+    public ModuleResponse updateModule(UUID moduleId, UpdateModuleRequest request) {
+        CourseModule module = courseModuleRepository.findById(moduleId)
+                .orElseThrow(() -> new RuntimeException("Module not found with id: " + moduleId));
+
+        // Update fields if provided
+        if (request.getTitle() != null) {
+            module.setTitle(request.getTitle());
+        }
+        if (request.getDescription() != null) {
+            module.setDescription(request.getDescription());
+        }
+        if (request.getOrderIndex() != null) {
+            module.setOrderIndex(request.getOrderIndex());
+        }
+        if (request.getIsSample() != null) {
+            module.setIsSample(request.getIsSample());
+        }
+
+        CourseModule updatedModule = courseModuleRepository.save(module);
+        return convertToModuleResponse(updatedModule);
+    }
+
+    private ModuleResponse convertToModuleResponse(CourseModule module) {
+        return ModuleResponse.builder()
+                .id(module.getId())
+                .courseId(module.getCourse() != null ? module.getCourse().getId() : null)
+                .title(module.getTitle())
+                .description(module.getDescription())
+                .orderIndex(module.getOrderIndex())
+                .isSample(module.getIsSample())
                 .build();
     }
 }

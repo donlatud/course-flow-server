@@ -128,6 +128,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleUnexpectedException(
             Exception exception,
             HttpServletRequest request) {
+        // Log the actual exception for debugging
+        System.err.println("=== UNEXPECTED EXCEPTION ===");
+        System.err.println("Path: " + request.getRequestURI());
+        exception.printStackTrace();
+        System.err.println("=== END EXCEPTION ===");
+        
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "INTERNAL_SERVER_ERROR",

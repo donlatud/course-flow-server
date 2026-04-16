@@ -166,6 +166,40 @@ public class AdminCourseService {
     }
 
     // -------------------------------------------------------------------------
+    // GET /api/admin/courses/all — Get all courses without pagination
+    // -------------------------------------------------------------------------
+
+    public List<CourseAdminSummaryResponse> getAllCourses() {
+        List<Course> courses = courseRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+        
+        if (courses.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> courseIds = courses.stream().map(Course::getId).toList();
+
+        Map<UUID, Long> lessonCountMap = courseModuleRepository.countByCourseIdIn(courseIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (UUID) row[0],
+                        row -> (Long) row[1]
+                ));
+
+        return courses.stream()
+                .map(c -> CourseAdminSummaryResponse.builder()
+                        .id(c.getId())
+                        .title(c.getTitle())
+                        .lessonCount(lessonCountMap.getOrDefault(c.getId(), 0L).intValue())
+                        .price(c.getPrice())
+                        .coverImageUrl(c.getCoverImageUrl())
+                        .status(c.getStatus())
+                        .createdAt(c.getCreatedAt())
+                        .updatedAt(c.getUpdatedAt())
+                        .build())
+                .toList();
+    }
+
+    // -------------------------------------------------------------------------
     // GET /api/admin/courses — Paginated list for the admin course table
     // -------------------------------------------------------------------------
 

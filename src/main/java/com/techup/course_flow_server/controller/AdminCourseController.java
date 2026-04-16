@@ -4,8 +4,11 @@ import com.techup.course_flow_server.dto.admin.course.CourseAdminDetailResponse;
 import com.techup.course_flow_server.dto.admin.course.CourseAdminSummaryResponse;
 import com.techup.course_flow_server.dto.admin.course.CreateCourseRequest;
 import com.techup.course_flow_server.dto.admin.course.UpdateCourseRequest;
+import com.techup.course_flow_server.dto.module.ModuleResponse;
 import com.techup.course_flow_server.service.AdminCourseService;
+import com.techup.course_flow_server.service.ModuleService;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -28,9 +31,20 @@ import org.springframework.data.domain.Page;
 public class AdminCourseController {
 
     private final AdminCourseService adminCourseService;
+    private final ModuleService moduleService;
 
-    public AdminCourseController(AdminCourseService adminCourseService) {
+    public AdminCourseController(AdminCourseService adminCourseService, ModuleService moduleService) {
         this.adminCourseService = adminCourseService;
+        this.moduleService = moduleService;
+    }
+
+    /**
+     * GET /api/admin/courses/all
+     * Get all courses without pagination.
+     */
+    @GetMapping("/all")
+    public List<CourseAdminSummaryResponse> getAllCourses() {
+        return adminCourseService.getAllCourses();
     }
 
     /**
@@ -90,5 +104,14 @@ public class AdminCourseController {
             @AuthenticationPrincipal Jwt jwt) {
         UUID adminUserId = UUID.fromString(jwt.getSubject());
         adminCourseService.deleteCourse(courseId, adminUserId);
+    }
+
+    /**
+     * Get all modules (lessons) for a specific course.
+     * Returns basic module info without materials.
+     */
+    @GetMapping("/{courseId}/modules")
+    public List<ModuleResponse> getModulesByCourseId(@PathVariable("courseId") UUID courseId) {
+        return moduleService.getModulesByCourseId(courseId);
     }
 }

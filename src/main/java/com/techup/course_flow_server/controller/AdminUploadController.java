@@ -4,6 +4,8 @@ import com.techup.course_flow_server.dto.upload.UploadUrlResponse;
 import com.techup.course_flow_server.upload.FileUploadService;
 import com.techup.course_flow_server.upload.ImageUploadService;
 import com.techup.course_flow_server.upload.VideoUploadService;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
