@@ -15,16 +15,15 @@ public interface CourseRepository extends JpaRepository<Course, UUID> {
 
     List<Course> findByCategory(String category);
 
-    List<Course> findByStatusOrderByCreatedAtDesc(Course.Status status);
+    List<Course> findByStatus(Course.Status status);
 
-    default List<Course> findPublishedCourses() {
-        return findByStatusOrderByCreatedAtDesc(Course.Status.PUBLISHED);
-    }
+    List<Course> findByAdminId(UUID adminId);
 
-    @Query(
-            "SELECT m.course.id, COUNT(m) FROM CourseModule m "
-                    + "WHERE m.course.id IN :ids GROUP BY m.course.id")
-    List<Object[]> countModulesByCourseIds(@Param("ids") List<UUID> ids);
+    @Query("SELECT c FROM Course c WHERE c.status = 'PUBLISHED' ORDER BY c.createdAt DESC")
+    List<Course> findPublishedCourses();
+
+    @Query("SELECT c.id, COUNT(cm) FROM Course c LEFT JOIN c.modules cm WHERE c.id IN :courseIds GROUP BY c.id")
+    List<Object[]> countModulesByCourseIds(@Param("courseIds") List<UUID> courseIds);
 
     Page<Course> findByTitleContainingIgnoreCase(String title, Pageable pageable);
 

@@ -41,6 +41,17 @@ public class MaterialService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Get all materials for a specific module.
+     */
+    public List<MaterialResponse> getMaterialsByModuleId(UUID moduleId) {
+        List<Material> materials = materialRepository.findAllByModuleIdOrderByOrderIndexAsc(moduleId);
+
+        return materials.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
     private MaterialResponse convertToResponse(Material material) {
         return MaterialResponse.builder()
                 .id(material.getId())

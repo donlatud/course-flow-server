@@ -35,6 +35,14 @@ public class Assignment {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "module_id")
+    private CourseModule module;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "material_id")
+    private Material material;
+
     private String title;
 
     @Column(columnDefinition = "TEXT")
@@ -45,4 +53,7 @@ public class Assignment {
 
     @Column(name = "end_date")
     private LocalDateTime endDate;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 }
