@@ -14,6 +14,34 @@ import org.springframework.data.repository.query.Param;
 public interface AssignmentRepository extends JpaRepository<Assignment, UUID> {
     List<Assignment> findAllByCourseIdOrderByStartDateAsc(UUID courseId);
 
+    /**
+     * Learner assignment list ordering:
+     * - Assignments linked to a module come first (by module.orderIndex ASC)
+     * - Assignments without a module are placed last
+     * - Within the same module (or null module), order by startDate ASC
+     */
+    @Query("""
+            SELECT a
+            FROM Assignment a
+            LEFT JOIN a.module m
+            WHERE a.course.id = :courseId
+            ORDER BY
+              CASE WHEN m IS NULL THEN 1 ELSE 0 END,
+              m.orderIndex ASC,
+              a.startDate ASC
+            """)
+    List<Assignment> findAllByCourseIdOrderByModuleOrderIndexAsc(@Param("courseId") UUID courseId);
+
+    @Query("""
+            SELECT a.course.id, COUNT(a)
+            FROM Assignment a
+            WHERE a.course.id IN :courseIds
+            GROUP BY a.course.id
+            """)
+    List<Object[]> countByCourseIdIn(@Param("courseIds") List<UUID> courseIds);
+
+    long countByCourseId(UUID courseId);
+
     List<Assignment> findAllByOrderByStartDateDesc();
 
     @Query("SELECT a FROM Assignment a LEFT JOIN FETCH a.course LEFT JOIN FETCH a.module LEFT JOIN FETCH a.material WHERE a.id = :assignmentId")

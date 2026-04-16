@@ -82,23 +82,13 @@ public class EnrollmentProgressCalculator {
                 .count();
 
         List<Assignment> assignments = assignmentRepository.findAllByCourseIdOrderByStartDateAsc(courseId);
-        List<UUID> assignmentIds = assignments.stream().map(Assignment::getId).toList();
-
-        Map<UUID, AssignmentSubmission> submissionByAssignmentId = assignmentIds.isEmpty()
-                ? Map.of()
-                : assignmentSubmissionRepository.findAllByAssignmentIdInAndUserId(assignmentIds, userId).stream()
-                        .collect(Collectors.toMap(
-                                s -> s.getAssignment().getId(),
-                                Function.identity(),
-                                (a, b) -> a));
 
         int totalAssignments = assignments.size();
-        int completedAssignments = (int) assignments.stream()
-                .filter(a -> {
-                    AssignmentSubmission s = submissionByAssignmentId.get(a.getId());
-                    return s != null && submissionCountsAsComplete(s);
-                })
-                .count();
+        int completedAssignments =
+                (int) assignmentSubmissionRepository.countByAssignmentCourseIdAndUserIdAndStatusIn(
+                        courseId,
+                        userId,
+                        List.of(AssignmentSubmission.Status.SUBMITTED, AssignmentSubmission.Status.GRADED));
 
         return new ProgressTotals(totalMaterials, completedMaterials, totalAssignments, completedAssignments);
     }

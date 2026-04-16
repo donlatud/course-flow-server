@@ -1,9 +1,11 @@
 package com.techup.course_flow_server.controller;
 
+import com.techup.course_flow_server.dto.assignment.MyAssignmentCourseResponse;
 import com.techup.course_flow_server.dto.assignment.AssignmentResponse;
 import com.techup.course_flow_server.dto.assignment.AssignmentSubmissionRequest;
 import com.techup.course_flow_server.dto.assignment.AssignmentSubmissionResponse;
 import com.techup.course_flow_server.service.AssignmentService;
+import com.techup.course_flow_server.service.MyAssignmentService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -21,9 +23,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class AssignmentController {
 
     private final AssignmentService assignmentService;
+    private final MyAssignmentService myAssignmentService;
 
-    public AssignmentController(AssignmentService assignmentService) {
+    public AssignmentController(AssignmentService assignmentService, MyAssignmentService myAssignmentService) {
         this.assignmentService = assignmentService;
+        this.myAssignmentService = myAssignmentService;
+    }
+
+    @GetMapping("/assignments/my-courses")
+    public List<MyAssignmentCourseResponse> getMyAssignmentCourses(@AuthenticationPrincipal Jwt jwt) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        return myAssignmentService.getMyAssignmentCourses(userId);
     }
 
     @GetMapping("/courses/{courseId}/assignments")
