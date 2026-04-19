@@ -4,9 +4,11 @@ import com.techup.course_flow_server.dto.admin.course.CourseAdminDetailResponse;
 import com.techup.course_flow_server.dto.admin.course.CourseAdminSummaryResponse;
 import com.techup.course_flow_server.dto.admin.course.CreateCourseRequest;
 import com.techup.course_flow_server.dto.admin.course.UpdateCourseRequest;
-import com.techup.course_flow_server.dto.module.ModuleResponse;
+import com.techup.course_flow_server.dto.admin.promo.AdminPromoCodeDetailResponse;
+import com.techup.course_flow_server.dto.admin.promo.AdminPromoCodeListItemResponse;
+import com.techup.course_flow_server.dto.admin.promo.AdminUpsertPromoCodeRequest;
 import com.techup.course_flow_server.service.AdminCourseService;
-import com.techup.course_flow_server.service.ModuleService;
+import com.techup.course_flow_server.service.AdminPromoCodeService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -31,20 +33,11 @@ import org.springframework.data.domain.Page;
 public class AdminCourseController {
 
     private final AdminCourseService adminCourseService;
-    private final ModuleService moduleService;
+    private final AdminPromoCodeService adminPromoCodeService;
 
-    public AdminCourseController(AdminCourseService adminCourseService, ModuleService moduleService) {
+    public AdminCourseController(AdminCourseService adminCourseService, AdminPromoCodeService adminPromoCodeService) {
         this.adminCourseService = adminCourseService;
-        this.moduleService = moduleService;
-    }
-
-    /**
-     * GET /api/admin/courses/all
-     * Get all courses without pagination.
-     */
-    @GetMapping("/all")
-    public List<CourseAdminSummaryResponse> getAllCourses() {
-        return adminCourseService.getAllCourses();
+        this.adminPromoCodeService = adminPromoCodeService;
     }
 
     /**
@@ -72,6 +65,29 @@ public class AdminCourseController {
     @GetMapping("/exists")
     public Map<String, Boolean> checkTitleExists(@RequestParam String title) {
         return Map.of("exists", adminCourseService.isTitleTaken(title));
+    }
+
+    /** Promo admin APIs live here so one restart picks up list/create/update without a separate controller bean. */
+    @GetMapping("/promo-codes")
+    public List<AdminPromoCodeListItemResponse> listPromoCodes() {
+        return adminPromoCodeService.listPromoCodes();
+    }
+
+    @GetMapping("/promo-codes/{promoCodeId}")
+    public AdminPromoCodeDetailResponse getPromoCode(@PathVariable UUID promoCodeId) {
+        return adminPromoCodeService.getPromoCode(promoCodeId);
+    }
+
+    @PostMapping("/promo-codes")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AdminPromoCodeDetailResponse createPromoCode(@Valid @RequestBody AdminUpsertPromoCodeRequest request) {
+        return adminPromoCodeService.create(request);
+    }
+
+    @PutMapping("/promo-codes/{promoCodeId}")
+    public AdminPromoCodeDetailResponse updatePromoCode(
+            @PathVariable UUID promoCodeId, @Valid @RequestBody AdminUpsertPromoCodeRequest request) {
+        return adminPromoCodeService.update(promoCodeId, request);
     }
 
     @GetMapping("/{courseId}")
