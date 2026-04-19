@@ -75,7 +75,13 @@ public class AdminPromoCodeService {
                 .minimumPurchaseAmount(request.getMinimumPurchaseAmount())
                 .build();
         PromoCode saved = promoCodeRepository.save(entity);
-        replaceCourseMappings(saved, courseIdsOrEmpty(request));
+        promoCodeRepository.flush();
+
+        List<UUID> courseIds = courseIdsOrEmpty(request);
+        if (courseIds != null && !courseIds.isEmpty()) {
+            replaceCourseMappings(saved, courseIds);
+        }
+
         return promoCodeRepository
                 .findWithCoursesById(saved.getId())
                 .map(this::toDetail)

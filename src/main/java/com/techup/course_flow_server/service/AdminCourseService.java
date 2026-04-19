@@ -117,14 +117,23 @@ public class AdminCourseService {
     private void savePromoCode(CreateCourseRequest request, Course createdCourse) {
         validatePromoDiscount(request.getPromoCode());
 
-        PromoCode promoCode = PromoCode.builder()
-                .code(request.getPromoCode().getCode().trim().toUpperCase())
-                .discountType(request.getPromoCode().getDiscountType())
-                .discountValue(request.getPromoCode().getDiscountValue())
-                .validFrom(request.getPromoCode().getValidFrom())
-                .validUntil(request.getPromoCode().getValidUntil())
-                .build();
-        PromoCode savedPromoCode = promoCodeRepository.save(promoCode);
+        String promoCodeValue = request.getPromoCode().getCode().trim().toUpperCase();
+        var existingPromo = promoCodeRepository.findByCodeIgnoreCase(promoCodeValue);
+        PromoCode savedPromoCode;
+
+        if (existingPromo.isPresent()) {
+            savedPromoCode = existingPromo.get();
+        } else {
+            PromoCode promoCode = PromoCode.builder()
+                    .code(promoCodeValue)
+                    .discountType(request.getPromoCode().getDiscountType())
+                    .discountValue(request.getPromoCode().getDiscountValue())
+                    .validFrom(request.getPromoCode().getValidFrom())
+                    .validUntil(request.getPromoCode().getValidUntil())
+                    .build();
+            savedPromoCode = promoCodeRepository.save(promoCode);
+            promoCodeRepository.flush();
+        }
 
         List<UUID> requestedCourseIds = request.getPromoCode().getCourseIds();
         List<Course> applicableCourses;
@@ -145,6 +154,7 @@ public class AdminCourseService {
                         .build())
                 .toList();
         promoCodeCourseRepository.saveAll(mappings);
+        promoCodeCourseRepository.flush();
     }
 
     private void validatePromoDiscount(CreatePromoCodeRequest promoRequest) {
