@@ -18,6 +18,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -51,6 +56,17 @@ public class AdminPromoCodeService {
         return promoCodeRepository.findAllByOrderByCodeAsc().stream()
                 .map(promo -> toListItem(promo, totalCourses))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminPromoCodeListItemResponse> listPromoCodesPaginated(int page, int size, String sortBy, String sortDir) {
+        long totalCourses = courseRepository.count();
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(sortDir), sortBy));
+        Page<PromoCode> promoPage = promoCodeRepository.findAll(pageable);
+        List<AdminPromoCodeListItemResponse> content = promoPage.getContent().stream()
+                .map(promo -> toListItem(promo, totalCourses))
+                .toList();
+        return new PageImpl<>(content, pageable, promoPage.getTotalElements());
     }
 
     @Transactional(readOnly = true)
