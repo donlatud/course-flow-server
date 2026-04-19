@@ -13,6 +13,8 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -69,8 +71,12 @@ public class AdminCourseController {
 
     /** Promo admin APIs live here so one restart picks up list/create/update without a separate controller bean. */
     @GetMapping("/promo-codes")
-    public List<AdminPromoCodeListItemResponse> listPromoCodes() {
-        return adminPromoCodeService.listPromoCodes();
+    public Page<AdminPromoCodeListItemResponse> listPromoCodes(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        return adminPromoCodeService.listPromoCodesPaginated(page, size, sortBy, sortDir);
     }
 
     @GetMapping("/promo-codes/{promoCodeId}")
