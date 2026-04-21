@@ -17,10 +17,20 @@ import com.techup.course_flow_server.entity.PromoCodeCourse;
 import com.techup.course_flow_server.entity.User;
 import com.techup.course_flow_server.repository.CourseModuleRepository;
 import com.techup.course_flow_server.repository.CourseRepository;
+import com.techup.course_flow_server.repository.EnrollmentRepository;
 import com.techup.course_flow_server.repository.MaterialRepository;
 import com.techup.course_flow_server.repository.PromoCodeCourseRepository;
 import com.techup.course_flow_server.repository.PromoCodeRepository;
+import com.techup.course_flow_server.repository.PromoRedemptionRepository;
 import com.techup.course_flow_server.repository.UserRepository;
+import com.techup.course_flow_server.repository.AssignmentRepository;
+import com.techup.course_flow_server.repository.AssignmentSubmissionRepository;
+import com.techup.course_flow_server.repository.WishlistRepository;
+import com.techup.course_flow_server.repository.OrderItemRepository;
+import com.techup.course_flow_server.repository.PromoCodeRepository;
+import com.techup.course_flow_server.repository.PromoRedemptionRepository;
+import com.techup.course_flow_server.repository.MaterialProgressRepository;
+import com.techup.course_flow_server.repository.ModuleProgressRepository;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -38,9 +48,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AdminCourseService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminCourseService.class);
 
     private final CourseRepository courseRepository;
     private final CourseModuleRepository courseModuleRepository;
@@ -48,6 +62,14 @@ public class AdminCourseService {
     private final PromoCodeRepository promoCodeRepository;
     private final PromoCodeCourseRepository promoCodeCourseRepository;
     private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final AssignmentRepository assignmentRepository;
+    private final AssignmentSubmissionRepository assignmentSubmissionRepository;
+    private final WishlistRepository wishlistRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final PromoRedemptionRepository promoRedemptionRepository;
+    private final MaterialProgressRepository materialProgressRepository;
+    private final ModuleProgressRepository moduleProgressRepository;
 
     public AdminCourseService(
             CourseRepository courseRepository,
@@ -55,13 +77,29 @@ public class AdminCourseService {
             MaterialRepository materialRepository,
             PromoCodeRepository promoCodeRepository,
             PromoCodeCourseRepository promoCodeCourseRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            EnrollmentRepository enrollmentRepository,
+            AssignmentRepository assignmentRepository,
+            AssignmentSubmissionRepository assignmentSubmissionRepository,
+            WishlistRepository wishlistRepository,
+            OrderItemRepository orderItemRepository,
+            PromoRedemptionRepository promoRedemptionRepository,
+            MaterialProgressRepository materialProgressRepository,
+            ModuleProgressRepository moduleProgressRepository) {
         this.courseRepository = courseRepository;
         this.courseModuleRepository = courseModuleRepository;
         this.materialRepository = materialRepository;
         this.promoCodeRepository = promoCodeRepository;
         this.promoCodeCourseRepository = promoCodeCourseRepository;
         this.userRepository = userRepository;
+        this.enrollmentRepository = enrollmentRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.assignmentSubmissionRepository = assignmentSubmissionRepository;
+        this.wishlistRepository = wishlistRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.promoRedemptionRepository = promoRedemptionRepository;
+        this.materialProgressRepository = materialProgressRepository;
+        this.moduleProgressRepository = moduleProgressRepository;
     }
 
     // -------------------------------------------------------------------------
@@ -432,10 +470,103 @@ public class AdminCourseService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this course");
         }
 
-        // Bulk delete: materials first (FK constraint), then modules, then course
+        // Bulk delete: related entities first, then materials, then modules, then course
+        log.info("=== DELETE course {} ===", courseId);
+        
+        // 1. Delete PromoCodeCourse records for this course, then clean up orphan PromoCodes
+        promoCodeCourseRepository.deleteByCourseId(courseId);
+        log.info("Deleted promo_code_course for course {}", courseId);
+        
+        promoCodeCourseRepository.flush();
+        
+        List<UUID> promoCodeIds = promoCodeCourseRepository.findPromoCodeIdsByCourseId(courseId);
+        promoCodeCourseRepository.flush();
+        log.info("Found {} promo codes: {}", promoCodeIds.size(), promoCodeIds);
+        
+        for (UUID promoCodeId : promoCodeIds) {
+            promoCodeCourseRepository.flush();
+            long remaining = promoCodeRepository.countByPromoCodeCoursesId(promoCodeId);
+            log.info("PromoCode {} remaining links: {}", promoCodeId, remaining);
+            if (remaining == 0) {
+                promoRedemptionRepository.deleteByPromoCodeId(promoCodeId);
+                promoRedemptionRepository.flush();
+                promoCodeRepository.deleteById(promoCodeId);
+                promoCodeRepository.flush();
+                log.info("Deleted orphan PromoCode {}", promoCodeId);
+            }
+        }
+        
+        // 2. Delete AssignmentSubmission
+        assignmentSubmissionRepository.deleteByAssignmentCourseId(courseId);
+        log.info("Deleted assignment_submissions");
+        
+        // 3. Delete Assignment  
+        assignmentRepository.deleteByCourseId(courseId);
+        log.info("Deleted assignments");
+        
+        // 4. Delete Wishlist
+        wishlistRepository.deleteByCourseId(courseId);
+        log.info("Deleted wishlists");
+        
+        // 5. Delete OrderItem
+        orderItemRepository.deleteByCourseId(courseId);
+        log.info("Deleted order_items");
+        
+        // 6. Delete MaterialProgress
+        materialProgressRepository.deleteByEnrollmentCourseId(courseId);
+        log.info("Deleted material_progress");
+        
+        // 7. Delete ModuleProgress
+        moduleProgressRepository.deleteByEnrollmentCourseId(courseId);
+        log.info("Deleted module_progress");
+        
+        // 8. Delete Enrollment
+        enrollmentRepository.deleteByCourseId(courseId);
+        log.info("Deleted enrollments");
+        
+        // 9. Delete Material
         materialRepository.deleteByCourseId(courseId);
+        log.info("Deleted materials");
+        
+        // 10. Delete CourseModule
         courseModuleRepository.deleteByCourseId(courseId);
+        log.info("Deleted course_modules");
+        
+        // 11. Delete Course
         courseRepository.deleteById(courseId);
+        log.info("=== Course {} deleted ===", courseId);
+        
+        log.info("Deleting assignment submissions");
+        assignmentSubmissionRepository.deleteByAssignmentCourseId(courseId);
+        
+        log.info("Deleting assignments");
+        assignmentRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting wishlist");
+        wishlistRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting order items");
+        orderItemRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting material progress");
+        materialProgressRepository.deleteByEnrollmentCourseId(courseId);
+        
+        log.info("Deleting module progress");
+        moduleProgressRepository.deleteByEnrollmentCourseId(courseId);
+        
+        log.info("Deleting enrollments");
+        enrollmentRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting materials");
+        materialRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting course modules");
+        courseModuleRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting course");
+        courseRepository.deleteById(courseId);
+        
+        log.info("Course {} deleted successfully", courseId);
     }
 
     // -------------------------------------------------------------------------

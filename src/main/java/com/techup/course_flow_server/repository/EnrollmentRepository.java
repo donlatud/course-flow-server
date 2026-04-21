@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -33,4 +34,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     List<Enrollment> findByUserIdAndStatus(UUID userId, Enrollment.Status status);
     List<Enrollment> findAllByUserIdAndStatusIn(UUID userId, List<Enrollment.Status> statuses);
     Optional<Enrollment> findByUserIdAndCourseId(UUID userId, UUID courseId);
+    long countByCourseId(UUID courseId);
+    @Modifying
+    @Query("DELETE FROM Enrollment e WHERE e.course.id = :courseId")
+    void deleteByCourseId(@Param("courseId") UUID courseId);
 }

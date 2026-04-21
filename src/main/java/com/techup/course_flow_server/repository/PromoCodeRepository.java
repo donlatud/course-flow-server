@@ -42,4 +42,6 @@ public interface PromoCodeRepository extends JpaRepository<PromoCode, UUID> {
 
     @Query(value = "SELECT * FROM promo_codes ORDER BY discount_type DESC", nativeQuery = true)
     Page<PromoCode> findAllOrderByDiscountTypeDesc(Pageable pageable);
+
+    long countByPromoCodeCoursesId(UUID promoCodeId);
 }
