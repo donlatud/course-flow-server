@@ -61,12 +61,53 @@ public class AdminPromoCodeService {
     @Transactional(readOnly = true)
     public Page<AdminPromoCodeListItemResponse> listPromoCodesPaginated(int page, int size, String sortBy, String sortDir) {
         long totalCourses = courseRepository.count();
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(sortDir), sortBy));
-        Page<PromoCode> promoPage = promoCodeRepository.findAll(pageable);
+        String key = sortBy == null ? "createdAt" : sortBy.trim();
+        boolean asc = "asc".equalsIgnoreCase(sortDir);
+
+        Page<PromoCode> promoPage;
+        if ("coursesincludedlength".equalsIgnoreCase(key)) {
+            Pageable unpagedSort = PageRequest.of(page, size);
+            promoPage = asc 
+                    ? promoCodeRepository.findAllOrderByCoursesCountAsc(unpagedSort)
+                    : promoCodeRepository.findAllOrderByCoursesCountDesc(unpagedSort);
+        } else {
+            String property = mapPromoCodeSortProperty(key);
+            Sort.Direction direction = asc ? Sort.Direction.ASC : Sort.Direction.DESC;
+
+            if ("minimumpurchaseamount".equals(key)) {
+                Pageable pageable = PageRequest.of(page, size);
+                promoPage = asc
+                        ? promoCodeRepository.findAllOrderByMinimumPurchaseAsc(pageable)
+                        : promoCodeRepository.findAllOrderByMinimumPurchaseDesc(pageable);
+            } else if ("discounttype".equals(key)) {
+                Pageable pageable = PageRequest.of(page, size);
+                promoPage = asc
+                        ? promoCodeRepository.findAllOrderByDiscountTypeAsc(pageable)
+                        : promoCodeRepository.findAllOrderByDiscountTypeDesc(pageable);
+            } else {
+                Pageable pageable = PageRequest.of(page, size, Sort.by(direction, property));
+                promoPage = promoCodeRepository.findAll(pageable);
+            }
+        }
+
         List<AdminPromoCodeListItemResponse> content = promoPage.getContent().stream()
                 .map(promo -> toListItem(promo, totalCourses))
                 .toList();
-        return new PageImpl<>(content, pageable, promoPage.getTotalElements());
+        return new PageImpl<>(content, promoPage.getPageable(), promoPage.getTotalElements());
+    }
+
+    private String mapPromoCodeSortProperty(String sortBy) {
+        if (sortBy == null || sortBy.isBlank()) {
+            return "createdAt";
+        }
+        return switch (sortBy.trim().toLowerCase()) {
+            case "code" -> "code";
+            case "minimumpurchaseamount" -> "minimumPurchaseAmount";
+            case "discounttype" -> "discountType";
+            case "createdat" -> "createdAt";
+            case "coursesincludedlength" -> "promoCodeCourses";
+            default -> "createdAt";
+        };
     }
 
     @Transactional(readOnly = true)
@@ -201,6 +242,7 @@ public class AdminPromoCodeService {
                 promo.getDiscountType(),
                 allCourses,
                 allCourses ? List.of() : titles,
+                linked,
                 promo.getCreatedAt());
     }
 
@@ -216,5 +258,14 @@ public class AdminPromoCodeService {
                 promo.getDiscountType(),
                 promo.getDiscountValue(),
                 courseIds);
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        PromoCode promo = promoCodeRepository
+                .findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Promo code not found"));
+        jdbcTemplate.update(DELETE_LINKS_SQL, id);
+        promoCodeRepository.delete(promo);
     }
 }
