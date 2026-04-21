@@ -7,8 +7,10 @@ import com.techup.course_flow_server.dto.admin.course.UpdateCourseRequest;
 import com.techup.course_flow_server.dto.admin.promo.AdminPromoCodeDetailResponse;
 import com.techup.course_flow_server.dto.admin.promo.AdminPromoCodeListItemResponse;
 import com.techup.course_flow_server.dto.admin.promo.AdminUpsertPromoCodeRequest;
+import com.techup.course_flow_server.dto.module.ModuleResponse;
 import com.techup.course_flow_server.service.AdminCourseService;
 import com.techup.course_flow_server.service.AdminPromoCodeService;
+import com.techup.course_flow_server.service.ModuleService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -36,10 +38,12 @@ public class AdminCourseController {
 
     private final AdminCourseService adminCourseService;
     private final AdminPromoCodeService adminPromoCodeService;
+    private final ModuleService moduleService;
 
-    public AdminCourseController(AdminCourseService adminCourseService, AdminPromoCodeService adminPromoCodeService) {
+    public AdminCourseController(AdminCourseService adminCourseService, AdminPromoCodeService adminPromoCodeService, ModuleService moduleService) {
         this.adminCourseService = adminCourseService;
         this.adminPromoCodeService = adminPromoCodeService;
+        this.moduleService = moduleService;
     }
 
     /**
@@ -94,6 +98,12 @@ public class AdminCourseController {
     public AdminPromoCodeDetailResponse updatePromoCode(
             @PathVariable UUID promoCodeId, @Valid @RequestBody AdminUpsertPromoCodeRequest request) {
         return adminPromoCodeService.update(promoCodeId, request);
+    }
+
+    @DeleteMapping("/promo-codes/{promoCodeId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePromoCode(@PathVariable UUID promoCodeId) {
+        adminPromoCodeService.delete(promoCodeId);
     }
 
     @GetMapping("/{courseId}")

@@ -8,6 +8,7 @@ import java.util.UUID;
 
 /**
  * One row for the admin promo code table.
+ * Sortable fields: code, minimumPurchaseAmount, discountType, createdAt, coursesIncludedLength
  */
 public record AdminPromoCodeListItemResponse(
         UUID id,
@@ -17,4 +18,5 @@ public record AdminPromoCodeListItemResponse(
         /** True when this promo is linked to every course in the database (at list time). */
         boolean allCourses,
         List<String> courseTitles,
+        int coursesIncludedLength,
         LocalDateTime createdAt) {}
