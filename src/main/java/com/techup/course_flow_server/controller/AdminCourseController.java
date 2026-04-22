@@ -72,6 +72,11 @@ public class AdminCourseController {
     public Map<String, Boolean> checkTitleExists(@RequestParam String title) {
         return Map.of("exists", adminCourseService.isTitleTaken(title));
     }
+    
+    @GetMapping("/all")
+    public List<CourseAdminSummaryResponse> getAllCourses() {
+        return adminCourseService.getAllCourses();
+    }
 
     /** Promo admin APIs live here so one restart picks up list/create/update without a separate controller bean. */
     @GetMapping("/promo-codes")
