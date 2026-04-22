@@ -2,6 +2,7 @@ package com.techup.course_flow_server.dto.admin.course;
 
 import com.techup.course_flow_server.entity.Course;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
