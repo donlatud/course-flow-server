@@ -195,11 +195,14 @@ public class GlobalExceptionHandler {
             Exception exception,
             HttpServletRequest request) {
         log.error("Unhandled exception on {}", request.getRequestURI(), exception);
-        log.error("Unhandled error on {}: {}", request.getRequestURI(), exception.toString(), exception);
+        String msg = exception.toString();
+        if (msg != null && msg.length() > 200) {
+            msg = msg.substring(0, 197) + "...";
+        }
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "INTERNAL_SERVER_ERROR",
-                "An unexpected error occurred",
+                msg,
                 request.getRequestURI());
     }
 
