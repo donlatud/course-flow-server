@@ -37,8 +37,9 @@ public final class UploadPathUtils {
     public static String safeAttachmentFileName(MultipartFile file) {
         String ext = fileExtension(file, "bin");
         String raw = file.getOriginalFilename();
+        String uuid = java.util.UUID.randomUUID().toString();
         if (raw == null || raw.isBlank()) {
-            return "attachment." + ext;
+            return uuid + "." + ext;
         }
         String base = raw.trim();
         int slash = Math.max(base.lastIndexOf('/'), base.lastIndexOf('\\'));
@@ -46,11 +47,10 @@ public final class UploadPathUtils {
             base = base.substring(slash + 1).trim();
         }
         if (base.isEmpty()) {
-            return "attachment." + ext;
+            return uuid + "." + ext;
         }
-        base = base.replace("..", "_");
-        // Storage / URL practicality
-        final int max = 200;
+        base = base.replace("..", "_").replace("/", "_").replace("\\", "_").replace(" ", "_").replaceAll("[^a-zA-Z0-9._-]", "_");
+        final int max = 180;
         if (base.length() > max) {
             if (base.contains(".")) {
                 String shortExt = base.substring(base.lastIndexOf('.') + 1);
@@ -59,12 +59,12 @@ public final class UploadPathUtils {
                 if (budget > 8) {
                     base = stem.substring(0, Math.min(stem.length(), budget)) + "." + shortExt;
                 } else {
-                    base = "attachment." + ext;
+                    return uuid + "." + ext;
                 }
             } else {
                 base = base.substring(0, max);
             }
         }
-        return base;
+        return uuid + "_" + base;
     }
 }

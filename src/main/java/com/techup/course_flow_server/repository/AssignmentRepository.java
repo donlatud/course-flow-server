@@ -67,4 +67,8 @@ public interface AssignmentRepository extends JpaRepository<Assignment, UUID> {
     @Modifying
     @Query("DELETE FROM Assignment a WHERE a.course.id = :courseId")
     void deleteByCourseId(@Param("courseId") UUID courseId);
+
+    @Modifying
+    @Query("DELETE FROM Assignment a WHERE a.module.id = :moduleId")
+    void deleteByModuleId(@Param("moduleId") UUID moduleId);
 }

@@ -446,6 +446,11 @@ public class AdminCourseService {
 
         // Replace all modules + materials
         materialRepository.deleteByCourseId(courseId);
+
+        // Delete assignments linked to modules before deleting modules
+        courseModuleRepository.findAllByCourseIdOrderByOrderIndexAsc(courseId)
+                .forEach(m -> assignmentRepository.deleteByModuleId(m.getId()));
+
         courseModuleRepository.deleteByCourseId(courseId);
 
         List<ModuleResponse> moduleResponses = (request.getModules() == null || request.getModules().isEmpty())
@@ -527,7 +532,12 @@ public class AdminCourseService {
         // 9. Delete Material
         materialRepository.deleteByCourseId(courseId);
         log.info("Deleted materials");
-        
+
+        // Delete assignments linked to modules before deleting modules
+        courseModuleRepository.findAllByCourseIdOrderByOrderIndexAsc(courseId)
+                .forEach(m -> assignmentRepository.deleteByModuleId(m.getId()));
+        log.info("Deleted assignments for modules");
+
         // 10. Delete CourseModule
         courseModuleRepository.deleteByCourseId(courseId);
         log.info("Deleted course_modules");
