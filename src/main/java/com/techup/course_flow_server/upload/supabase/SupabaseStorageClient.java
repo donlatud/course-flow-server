@@ -62,6 +62,7 @@ public class SupabaseStorageClient {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + key)
                     .header("apikey", key)
                     .header(HttpHeaders.CONTENT_TYPE, ct)
+                    .header("x-upsert", "true")
                     .body(data)
                     .retrieve()
                     .onStatus(

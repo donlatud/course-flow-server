@@ -1,6 +1,7 @@
 package com.techup.course_flow_server.dto.admin.course;
 
 import com.techup.course_flow_server.entity.PromoCode;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -29,6 +30,7 @@ public class CreatePromoCodeRequest {
 
     @NotNull(message = "Discount value is required")
     @DecimalMin(value = "0.00", inclusive = true, message = "Discount value must be at least 0")
+    @DecimalMax(value = "99999999.99", message = "Discount value is too large")
     private BigDecimal discountValue;
 
     private LocalDateTime validFrom;

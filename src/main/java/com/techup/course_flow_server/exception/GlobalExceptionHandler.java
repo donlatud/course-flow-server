@@ -50,9 +50,12 @@ public class GlobalExceptionHandler {
             DataIntegrityViolationException exception,
             HttpServletRequest request) {
         String msg = exception.getMostSpecificCause().getMessage();
+        log.error("DataIntegrityViolation: {}", msg);
         String message;
         if (msg != null && msg.contains("uk_courses_title")) {
             message = "A course with this title already exists";
+        } else if (msg != null && msg.toLowerCase().contains("promo_code")) {
+            message = "Promo code already exists";
         } else if (msg != null) {
             String oneLine = msg.replaceAll("\\s+", " ").trim();
             if (oneLine.length() > 300) {
