@@ -35,6 +35,7 @@ public class CreateCourseRequest {
     /** Matches UI field: Price */
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.00", inclusive = true, message = "Price must not be negative")
+    @DecimalMax(value = "99999999.99", message = "Price is too large")
     private BigDecimal price;
 
     /** Matches UI field: Total learning time (hours) */
