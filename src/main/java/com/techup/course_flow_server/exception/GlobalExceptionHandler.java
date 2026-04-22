@@ -54,8 +54,8 @@ public class GlobalExceptionHandler {
         String message;
         if (msg != null && msg.contains("uk_courses_title")) {
             message = "A course with this title already exists";
-        } else if (msg != null && msg.toLowerCase().contains("promo_code")) {
-            message = "Promo code already exists";
+        } else if (msg != null && (msg.contains("uk_promo_codes_code") || msg.contains("promo_codes_code_key"))) {
+            message = "This promo code already exists";
         } else if (msg != null) {
             String oneLine = msg.replaceAll("\\s+", " ").trim();
             if (oneLine.length() > 300) {
