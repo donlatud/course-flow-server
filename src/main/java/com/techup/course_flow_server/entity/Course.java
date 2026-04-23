@@ -9,9 +9,14 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,7 +28,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
-@Table(name = "courses")
+@Table(
+        name = "courses",
+        uniqueConstraints = @UniqueConstraint(name = "uk_courses_title", columnNames = "title")
+)
 @Getter
 @Setter
 @Builder
@@ -39,8 +47,17 @@ public class Course {
     @Column(nullable = false)
     private String title;
 
+    /**
+     * Short description / summary shown in course card and header.
+     */
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    /**
+     * Full course detail text (syllabus, long copy).
+     */
+    @Column(columnDefinition = "TEXT")
+    private String detail;
 
     @Column(precision = 10, scale = 2)
     private BigDecimal price;
@@ -48,6 +65,30 @@ public class Course {
     private String category;
 
     private String subject;
+
+    /**
+     * Total learning time in hours (e.g. 6, 12).
+     */
+    @Column(name = "total_learning_time")
+    private Integer totalLearningTime;
+
+    /**
+     * Public URL of the course cover image.
+     */
+    @Column(name = "cover_image_url")
+    private String coverImageUrl;
+
+    /**
+     * Public URL of the trailer video.
+     */
+    @Column(name = "trailer_video_url")
+    private String trailerVideoUrl;
+
+    /**
+     * Optional attachment file URL (e.g. PDF syllabus).
+     */
+    @Column(name = "attachment_url")
+    private String attachmentUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -58,6 +99,9 @@ public class Course {
     @JoinColumn(name = "admin_id")
     private User admin;
 
+    @OneToMany(mappedBy = "course", fetch = FetchType.LAZY)
+    private List<CourseModule> modules;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -65,6 +109,10 @@ public class Course {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "course")
+    @Builder.Default
+    private Set<PromoCodeCourse> promoCodeCourses = new HashSet<>();
 
     public enum Status {
         DRAFT,

@@ -30,6 +30,12 @@ import org.hibernate.annotations.UuidGenerator;
 @AllArgsConstructor
 public class Order {
 
+    /**
+     * Pending orders expire 60 minutes after creation.
+     * This value is used by service-layer lazy expiry checks.
+     */
+    private static final long EXPIRY_MINUTES = 60L;
+
     @Id
     @GeneratedValue
     @UuidGenerator
@@ -55,9 +61,47 @@ public class Order {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
+    /**
+     * Returns the timestamp after which this order should no longer be used
+     * for payment attempts.
+     */
+    public LocalDateTime getExpiresAt() {
+        if (expiresAt != null) {
+            return expiresAt;
+        }
+        return createdAt == null ? null : createdAt.plusMinutes(EXPIRY_MINUTES);
+    }
+
+    /**
+     * Whether this pending order is past its expiry instant.
+     * <p>
+     * Uses the same instant as {@link #getExpiresAt()} (persisted {@code expires_at}
+     * when set, otherwise {@code created_at + EXPIRY_MINUTES}) so checks match what
+     * APIs return to clients.
+     * <p>
+     * <strong>DB note:</strong> status does not flip to {@link Status#EXPIRED} by
+     * itself when clock time passes — there is no scheduler. A row stays
+     * {@code PENDING} until some service call runs {@code markExpiredIfNeeded} /
+     * payment flow (lazy expiry), or you add a scheduled job later.
+     */
+    public boolean isExpiredAt(LocalDateTime referenceTime) {
+        if (status != Status.PENDING || referenceTime == null) {
+            return false;
+        }
+        LocalDateTime expires = getExpiresAt();
+        if (expires == null) {
+            return false;
+        }
+        return !referenceTime.isBefore(expires);
+    }
+
     public enum Status {
         PENDING,
         COMPLETED,
-        FAILED
+        FAILED,
+        EXPIRED
     }
 }

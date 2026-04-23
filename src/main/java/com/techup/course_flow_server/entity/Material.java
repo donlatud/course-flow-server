@@ -36,12 +36,23 @@ public class Material {
     @JoinColumn(name = "module_id", nullable = false)
     private CourseModule module;
 
+    private String title;
+
+    @Column(name = "order_index")
+    private Integer orderIndex;
+
     @Column(name = "file_url")
     private String fileUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String detail;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "file_type", nullable = false)
     private FileType fileType;
+
+    /** Playback length in seconds; null for non-video materials. */
+    private Integer duration;
 
     public enum FileType {
         PDF,
