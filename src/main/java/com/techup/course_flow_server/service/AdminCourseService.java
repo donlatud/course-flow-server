@@ -6,19 +6,33 @@ import com.techup.course_flow_server.dto.admin.course.CourseAdminDetailResponse.
 import com.techup.course_flow_server.dto.admin.course.CourseAdminSummaryResponse;
 import com.techup.course_flow_server.dto.admin.course.CreateCourseRequest;
 import com.techup.course_flow_server.dto.admin.course.CreateModuleRequest;
+import com.techup.course_flow_server.dto.admin.course.CreatePromoCodeRequest;
 import com.techup.course_flow_server.dto.admin.course.CreateSubLessonRequest;
 import com.techup.course_flow_server.dto.admin.course.UpdateCourseRequest;
 import com.techup.course_flow_server.entity.Course;
 import com.techup.course_flow_server.entity.CourseModule;
 import com.techup.course_flow_server.entity.Material;
 import com.techup.course_flow_server.entity.PromoCode;
+import com.techup.course_flow_server.entity.PromoCodeCourse;
 import com.techup.course_flow_server.entity.User;
 import com.techup.course_flow_server.repository.CourseModuleRepository;
 import com.techup.course_flow_server.repository.CourseRepository;
+import com.techup.course_flow_server.repository.EnrollmentRepository;
 import com.techup.course_flow_server.repository.MaterialRepository;
+import com.techup.course_flow_server.repository.PromoCodeCourseRepository;
 import com.techup.course_flow_server.repository.PromoCodeRepository;
+import com.techup.course_flow_server.repository.PromoRedemptionRepository;
 import com.techup.course_flow_server.repository.UserRepository;
+import com.techup.course_flow_server.repository.AssignmentRepository;
+import com.techup.course_flow_server.repository.AssignmentSubmissionRepository;
+import com.techup.course_flow_server.repository.WishlistRepository;
+import com.techup.course_flow_server.repository.OrderItemRepository;
+import com.techup.course_flow_server.repository.PromoCodeRepository;
+import com.techup.course_flow_server.repository.PromoRedemptionRepository;
+import com.techup.course_flow_server.repository.MaterialProgressRepository;
+import com.techup.course_flow_server.repository.ModuleProgressRepository;
 import jakarta.transaction.Transactional;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -34,27 +48,58 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AdminCourseService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminCourseService.class);
 
     private final CourseRepository courseRepository;
     private final CourseModuleRepository courseModuleRepository;
     private final MaterialRepository materialRepository;
     private final PromoCodeRepository promoCodeRepository;
+    private final PromoCodeCourseRepository promoCodeCourseRepository;
     private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final AssignmentRepository assignmentRepository;
+    private final AssignmentSubmissionRepository assignmentSubmissionRepository;
+    private final WishlistRepository wishlistRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final PromoRedemptionRepository promoRedemptionRepository;
+    private final MaterialProgressRepository materialProgressRepository;
+    private final ModuleProgressRepository moduleProgressRepository;
 
     public AdminCourseService(
             CourseRepository courseRepository,
             CourseModuleRepository courseModuleRepository,
             MaterialRepository materialRepository,
             PromoCodeRepository promoCodeRepository,
-            UserRepository userRepository) {
+            PromoCodeCourseRepository promoCodeCourseRepository,
+            UserRepository userRepository,
+            EnrollmentRepository enrollmentRepository,
+            AssignmentRepository assignmentRepository,
+            AssignmentSubmissionRepository assignmentSubmissionRepository,
+            WishlistRepository wishlistRepository,
+            OrderItemRepository orderItemRepository,
+            PromoRedemptionRepository promoRedemptionRepository,
+            MaterialProgressRepository materialProgressRepository,
+            ModuleProgressRepository moduleProgressRepository) {
         this.courseRepository = courseRepository;
         this.courseModuleRepository = courseModuleRepository;
         this.materialRepository = materialRepository;
         this.promoCodeRepository = promoCodeRepository;
+        this.promoCodeCourseRepository = promoCodeCourseRepository;
         this.userRepository = userRepository;
+        this.enrollmentRepository = enrollmentRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.assignmentSubmissionRepository = assignmentSubmissionRepository;
+        this.wishlistRepository = wishlistRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.promoRedemptionRepository = promoRedemptionRepository;
+        this.materialProgressRepository = materialProgressRepository;
+        this.moduleProgressRepository = moduleProgressRepository;
     }
 
     // -------------------------------------------------------------------------
@@ -76,7 +121,7 @@ public class AdminCourseService {
         User admin = fetchAdmin(adminUserId);
         Course course = buildAndSaveCourse(request, admin);
         if (request.getPromoCode() != null) {
-            savePromoCode(request);
+            savePromoCode(request, course);
         }
         List<ModuleResponse> moduleResponses = saveModulesAndMaterials(request.getModules(), course);
         return buildDetailResponse(course, moduleResponses);
@@ -107,15 +152,65 @@ public class AdminCourseService {
         return courseRepository.save(course);
     }
 
-    private void savePromoCode(CreateCourseRequest request) {
-        PromoCode promoCode = PromoCode.builder()
-                .code(request.getPromoCode().getCode().trim().toUpperCase())
-                .discountType(request.getPromoCode().getDiscountType())
-                .discountValue(request.getPromoCode().getDiscountValue())
-                .validFrom(request.getPromoCode().getValidFrom())
-                .validUntil(request.getPromoCode().getValidUntil())
-                .build();
-        promoCodeRepository.save(promoCode);
+    private void savePromoCode(CreateCourseRequest request, Course createdCourse) {
+        validatePromoDiscount(request.getPromoCode());
+
+        String promoCodeValue = request.getPromoCode().getCode().trim().toUpperCase();
+        var existingPromo = promoCodeRepository.findByCodeIgnoreCase(promoCodeValue);
+        PromoCode savedPromoCode;
+
+        if (existingPromo.isPresent()) {
+            savedPromoCode = existingPromo.get();
+        } else {
+            PromoCode promoCode = PromoCode.builder()
+                    .code(promoCodeValue)
+                    .discountType(request.getPromoCode().getDiscountType())
+                    .discountValue(request.getPromoCode().getDiscountValue())
+                    .validFrom(request.getPromoCode().getValidFrom())
+                    .validUntil(request.getPromoCode().getValidUntil())
+                    .build();
+            savedPromoCode = promoCodeRepository.save(promoCode);
+            promoCodeRepository.flush();
+        }
+
+        List<UUID> requestedCourseIds = request.getPromoCode().getCourseIds();
+        List<Course> applicableCourses;
+        if (requestedCourseIds == null || requestedCourseIds.isEmpty()) {
+            // Backward-compatible behavior for old payloads from course-create flow.
+            applicableCourses = List.of(createdCourse);
+        } else {
+            applicableCourses = courseRepository.findAllById(requestedCourseIds);
+            if (applicableCourses.size() != new HashSet<>(requestedCourseIds).size()) {
+                throw new IllegalArgumentException("One or more courseIds are invalid");
+            }
+        }
+
+        List<PromoCodeCourse> mappings = applicableCourses.stream()
+                .map(course -> PromoCodeCourse.builder()
+                        .promoCode(savedPromoCode)
+                        .course(course)
+                        .build())
+                .toList();
+        promoCodeCourseRepository.saveAll(mappings);
+        promoCodeCourseRepository.flush();
+    }
+
+    private void validatePromoDiscount(CreatePromoCodeRequest promoRequest) {
+        if (promoRequest.getDiscountValue() == null || promoRequest.getDiscountType() == null) {
+            return;
+        }
+
+        BigDecimal value = promoRequest.getDiscountValue();
+        if (value.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Discount value must be at least 0");
+        }
+
+        if (promoRequest.getDiscountType() == PromoCode.DiscountType.PERCENTAGE
+                && value.compareTo(new BigDecimal("100")) > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Percent discount must be between 0 and 100");
+        }
     }
 
     private List<ModuleResponse> saveModulesAndMaterials(
@@ -351,6 +446,11 @@ public class AdminCourseService {
 
         // Replace all modules + materials
         materialRepository.deleteByCourseId(courseId);
+
+        // Delete assignments linked to modules before deleting modules
+        courseModuleRepository.findAllByCourseIdOrderByOrderIndexAsc(courseId)
+                .forEach(m -> assignmentRepository.deleteByModuleId(m.getId()));
+
         courseModuleRepository.deleteByCourseId(courseId);
 
         List<ModuleResponse> moduleResponses = (request.getModules() == null || request.getModules().isEmpty())
@@ -375,10 +475,108 @@ public class AdminCourseService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this course");
         }
 
-        // Bulk delete: materials first (FK constraint), then modules, then course
+        // Bulk delete: related entities first, then materials, then modules, then course
+        log.info("=== DELETE course {} ===", courseId);
+        
+        // 1. Delete PromoCodeCourse records for this course, then clean up orphan PromoCodes
+        promoCodeCourseRepository.deleteByCourseId(courseId);
+        log.info("Deleted promo_code_course for course {}", courseId);
+        
+        promoCodeCourseRepository.flush();
+        
+        List<UUID> promoCodeIds = promoCodeCourseRepository.findPromoCodeIdsByCourseId(courseId);
+        promoCodeCourseRepository.flush();
+        log.info("Found {} promo codes: {}", promoCodeIds.size(), promoCodeIds);
+        
+        for (UUID promoCodeId : promoCodeIds) {
+            promoCodeCourseRepository.flush();
+            long remaining = promoCodeRepository.countByPromoCodeCoursesId(promoCodeId);
+            log.info("PromoCode {} remaining links: {}", promoCodeId, remaining);
+            if (remaining == 0) {
+                promoRedemptionRepository.deleteByPromoCodeId(promoCodeId);
+                promoRedemptionRepository.flush();
+                promoCodeRepository.deleteById(promoCodeId);
+                promoCodeRepository.flush();
+                log.info("Deleted orphan PromoCode {}", promoCodeId);
+            }
+        }
+        
+        // 2. Delete AssignmentSubmission
+        assignmentSubmissionRepository.deleteByAssignmentCourseId(courseId);
+        log.info("Deleted assignment_submissions");
+        
+        // 3. Delete Assignment  
+        assignmentRepository.deleteByCourseId(courseId);
+        log.info("Deleted assignments");
+        
+        // 4. Delete Wishlist
+        wishlistRepository.deleteByCourseId(courseId);
+        log.info("Deleted wishlists");
+        
+        // 5. Delete OrderItem
+        orderItemRepository.deleteByCourseId(courseId);
+        log.info("Deleted order_items");
+        
+        // 6. Delete MaterialProgress
+        materialProgressRepository.deleteByEnrollmentCourseId(courseId);
+        log.info("Deleted material_progress");
+        
+        // 7. Delete ModuleProgress
+        moduleProgressRepository.deleteByEnrollmentCourseId(courseId);
+        log.info("Deleted module_progress");
+        
+        // 8. Delete Enrollment
+        enrollmentRepository.deleteByCourseId(courseId);
+        log.info("Deleted enrollments");
+        
+        // 9. Delete Material
         materialRepository.deleteByCourseId(courseId);
+        log.info("Deleted materials");
+
+        // Delete assignments linked to modules before deleting modules
+        courseModuleRepository.findAllByCourseIdOrderByOrderIndexAsc(courseId)
+                .forEach(m -> assignmentRepository.deleteByModuleId(m.getId()));
+        log.info("Deleted assignments for modules");
+
+        // 10. Delete CourseModule
         courseModuleRepository.deleteByCourseId(courseId);
+        log.info("Deleted course_modules");
+        
+        // 11. Delete Course
         courseRepository.deleteById(courseId);
+        log.info("=== Course {} deleted ===", courseId);
+        
+        log.info("Deleting assignment submissions");
+        assignmentSubmissionRepository.deleteByAssignmentCourseId(courseId);
+        
+        log.info("Deleting assignments");
+        assignmentRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting wishlist");
+        wishlistRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting order items");
+        orderItemRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting material progress");
+        materialProgressRepository.deleteByEnrollmentCourseId(courseId);
+        
+        log.info("Deleting module progress");
+        moduleProgressRepository.deleteByEnrollmentCourseId(courseId);
+        
+        log.info("Deleting enrollments");
+        enrollmentRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting materials");
+        materialRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting course modules");
+        courseModuleRepository.deleteByCourseId(courseId);
+        
+        log.info("Deleting course");
+        courseRepository.deleteById(courseId);
+        
+        log.info("Course {} deleted successfully", courseId);
     }
 
     // -------------------------------------------------------------------------

@@ -1,11 +1,14 @@
 package com.techup.course_flow_server.upload.supabase;
 
 import com.techup.course_flow_server.config.SupabaseProperties;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -59,6 +62,7 @@ public class SupabaseStorageClient {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + key)
                     .header("apikey", key)
                     .header(HttpHeaders.CONTENT_TYPE, ct)
+                    .header("x-upsert", "true")
                     .body(data)
                     .retrieve()
                     .onStatus(
@@ -70,7 +74,7 @@ public class SupabaseStorageClient {
                                                 + " "
                                                 + res.getStatusText()
                                                 + " — "
-                                                + new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                                                + readErrorBodySafely(res));
                             })
                     .toBodilessEntity();
         } catch (SupabaseStorageException e) {
@@ -81,6 +85,19 @@ public class SupabaseStorageClient {
         }
 
         return getPublicUrl(bucket, objectPath);
+    }
+
+    /** Avoid NPE / IO failures when mapping Storage errors (prevents generic HTTP 500). */
+    private static String readErrorBodySafely(ClientHttpResponse res) {
+        try {
+            InputStream in = res.getBody();
+            if (in == null) {
+                return "";
+            }
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "(could not read error body: " + e.getMessage() + ")";
+        }
     }
 
     /**

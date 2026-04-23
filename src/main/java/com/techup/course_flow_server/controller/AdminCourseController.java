@@ -4,13 +4,19 @@ import com.techup.course_flow_server.dto.admin.course.CourseAdminDetailResponse;
 import com.techup.course_flow_server.dto.admin.course.CourseAdminSummaryResponse;
 import com.techup.course_flow_server.dto.admin.course.CreateCourseRequest;
 import com.techup.course_flow_server.dto.admin.course.UpdateCourseRequest;
+import com.techup.course_flow_server.dto.admin.promo.AdminPromoCodeDetailResponse;
+import com.techup.course_flow_server.dto.admin.promo.AdminPromoCodeListItemResponse;
+import com.techup.course_flow_server.dto.admin.promo.AdminUpsertPromoCodeRequest;
 import com.techup.course_flow_server.dto.module.ModuleResponse;
 import com.techup.course_flow_server.service.AdminCourseService;
+import com.techup.course_flow_server.service.AdminPromoCodeService;
 import com.techup.course_flow_server.service.ModuleService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -31,20 +37,13 @@ import org.springframework.data.domain.Page;
 public class AdminCourseController {
 
     private final AdminCourseService adminCourseService;
+    private final AdminPromoCodeService adminPromoCodeService;
     private final ModuleService moduleService;
 
-    public AdminCourseController(AdminCourseService adminCourseService, ModuleService moduleService) {
+    public AdminCourseController(AdminCourseService adminCourseService, AdminPromoCodeService adminPromoCodeService, ModuleService moduleService) {
         this.adminCourseService = adminCourseService;
+        this.adminPromoCodeService = adminPromoCodeService;
         this.moduleService = moduleService;
-    }
-
-    /**
-     * GET /api/admin/courses/all
-     * Get all courses without pagination.
-     */
-    @GetMapping("/all")
-    public List<CourseAdminSummaryResponse> getAllCourses() {
-        return adminCourseService.getAllCourses();
     }
 
     /**
@@ -72,6 +71,44 @@ public class AdminCourseController {
     @GetMapping("/exists")
     public Map<String, Boolean> checkTitleExists(@RequestParam String title) {
         return Map.of("exists", adminCourseService.isTitleTaken(title));
+    }
+    
+    @GetMapping("/all")
+    public List<CourseAdminSummaryResponse> getAllCourses() {
+        return adminCourseService.getAllCourses();
+    }
+
+    /** Promo admin APIs live here so one restart picks up list/create/update without a separate controller bean. */
+    @GetMapping("/promo-codes")
+    public Page<AdminPromoCodeListItemResponse> listPromoCodes(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        return adminPromoCodeService.listPromoCodesPaginated(page, size, sortBy, sortDir);
+    }
+
+    @GetMapping("/promo-codes/{promoCodeId}")
+    public AdminPromoCodeDetailResponse getPromoCode(@PathVariable UUID promoCodeId) {
+        return adminPromoCodeService.getPromoCode(promoCodeId);
+    }
+
+    @PostMapping("/promo-codes")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AdminPromoCodeDetailResponse createPromoCode(@Valid @RequestBody AdminUpsertPromoCodeRequest request) {
+        return adminPromoCodeService.create(request);
+    }
+
+    @PutMapping("/promo-codes/{promoCodeId}")
+    public AdminPromoCodeDetailResponse updatePromoCode(
+            @PathVariable UUID promoCodeId, @Valid @RequestBody AdminUpsertPromoCodeRequest request) {
+        return adminPromoCodeService.update(promoCodeId, request);
+    }
+
+    @DeleteMapping("/promo-codes/{promoCodeId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePromoCode(@PathVariable UUID promoCodeId) {
+        adminPromoCodeService.delete(promoCodeId);
     }
 
     @GetMapping("/{courseId}")

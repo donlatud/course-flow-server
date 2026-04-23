@@ -8,9 +8,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
+@Repository
 public interface AssignmentRepository extends JpaRepository<Assignment, UUID> {
     List<Assignment> findAllByCourseIdOrderByStartDateAsc(UUID courseId);
 
@@ -60,4 +63,12 @@ public interface AssignmentRepository extends JpaRepository<Assignment, UUID> {
     // Search by title (case-insensitive, contains)
     @Query("SELECT a FROM Assignment a WHERE LOWER(a.title) LIKE LOWER(CONCAT('%', :search, '%'))")
     Page<Assignment> findByTitleContainingIgnoreCase(@Param("search") String search, Pageable pageable);
+
+    @Modifying
+    @Query("DELETE FROM Assignment a WHERE a.course.id = :courseId")
+    void deleteByCourseId(@Param("courseId") UUID courseId);
+
+    @Modifying
+    @Query("DELETE FROM Assignment a WHERE a.module.id = :moduleId")
+    void deleteByModuleId(@Param("moduleId") UUID moduleId);
 }

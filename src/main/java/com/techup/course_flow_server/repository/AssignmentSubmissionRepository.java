@@ -5,9 +5,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
+@Repository
 public interface AssignmentSubmissionRepository extends JpaRepository<AssignmentSubmission, UUID> {
     Optional<AssignmentSubmission> findByAssignmentIdAndUserId(UUID assignmentId, UUID userId);
 
@@ -54,4 +57,8 @@ public interface AssignmentSubmissionRepository extends JpaRepository<Assignment
             @Param("courseIds") List<UUID> courseIds,
             @Param("userId") UUID userId,
             @Param("statuses") List<AssignmentSubmission.Status> statuses);
+
+    @Modifying
+    @Query("DELETE FROM AssignmentSubmission s WHERE s.assignment.course.id = :courseId")
+    void deleteByAssignmentCourseId(@Param("courseId") UUID courseId);
 }

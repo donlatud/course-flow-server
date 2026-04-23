@@ -31,7 +31,7 @@ public class FileUploadService {
         }
         try {
             String url = storageClient.upload(bucket, objectPath, file.getBytes(), ct);
-            return UploadUrlResponse.builder().url(url).provider("SUPABASE").build();
+            return new UploadUrlResponse(url, "SUPABASE");
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read uploaded file", e);
         }
