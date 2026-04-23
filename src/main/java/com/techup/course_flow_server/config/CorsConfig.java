@@ -44,9 +44,12 @@ public class CorsConfig {
                         .allowedHeaders("*")
                         .allowCredentials(true);
 
+                // Apply both when set: legacy code used if/else so env-only CORS_ALLOWED_ORIGINS was ignored
+                // whenever default localhost patterns were non-empty (common on Render + Vercel).
                 if (patterns.length > 0) {
                     reg.allowedOriginPatterns(patterns);
-                } else {
+                }
+                if (origins.length > 0) {
                     reg.allowedOrigins(origins);
                 }
             }
