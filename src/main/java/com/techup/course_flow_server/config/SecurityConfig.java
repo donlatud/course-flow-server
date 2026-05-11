@@ -42,6 +42,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.GET, "/health").permitAll()
                 .requestMatchers("/api/auth/**", "/api/webhooks/**").permitAll()
                 // Public catalog only — do NOT use /api/courses/** (would expose /learning & /assignments without JWT
                 // and cause NPE on jwt.getSubject() → 500).
